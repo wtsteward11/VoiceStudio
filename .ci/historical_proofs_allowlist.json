@@ -6,5 +6,7 @@
   {"path": "docs/reports/verification/PROOF_BACKEND_COLD_START_2026-03-05.json"},
   {"path": "docs/reports/verification/PROOF_GOLDEN_PATH_STUB_2026-03-05.json"},
   {"path": "docs/reports/verification/PROOF_PERF_BUDGET_RUNTIME_2026-03-05.json"},
-  {"path": "docs/reports/verification/PROOF_SUPPORT_BUNDLE_RUNTIME_2026-03-05.json"}
+  {"path": "docs/reports/verification/PROOF_SUPPORT_BUNDLE_RUNTIME_2026-03-05.json"},
+  {"path": "docs/reports/verification/PROOF_GOLDEN_PATH_REAL_2026-03-06.json"},
+  {"path": "docs/reports/verification/PROOF_GOLDEN_PATH_REAL_2026-03-15.json"}
 ]

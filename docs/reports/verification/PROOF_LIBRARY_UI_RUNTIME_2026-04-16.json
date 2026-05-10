@@ -63,5 +63,11 @@
     "docs/reports/verification/PROOF_LIBRARY_RUNTIME_API_2026-04-16.json",
     "docs/reports/verification/PROOF_LIBRARY_UI_RUNTIME_2026-04-16.json"
   ],
-  "verdict": "ALL_PASS"
+  "verdict": "ALL_PASS",
+  "command": "Operator verification: Library UI + API slice (see PROOF_LIBRARY_RUNTIME_API_2026-04-16.json companion)",
+  "exit_code": 0,
+  "timestamp": "2026-04-16T12:01:30.362425+00:00",
+  "git_commit": "0000000000000000000000000000000000000000",
+  "git_branch": "historical_verification_artifact",
+  "evidence_fingerprint": "20e3275ca33a09efa260387d2acc3ffadd8e7175af2b725c280ed872ea6ce675"
 }

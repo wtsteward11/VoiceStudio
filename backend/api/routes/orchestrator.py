@@ -76,8 +76,15 @@ def _try_run_next(service: Any, scheduler: Any) -> None:
         finally:
             _try_run_next(service, scheduler)
 
-    executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+    executor = concurrent.futures.ThreadPoolExecutor(
+        max_workers=1, thread_name_prefix="orchestrator-job"
+    )
     executor.submit(_run, job.job_id)
+    # ``shutdown(wait=False)`` lets the in-flight ``_run`` finish, then signals
+    # the worker thread to exit. Without this, CPython's non-daemon executor
+    # workers can survive interpreter shutdown long enough to delay process
+    # exit, contributing to PR #49's post-pytest hang on CI.
+    executor.shutdown(wait=False)
 
 
 @router.get("/status/{job_id}")

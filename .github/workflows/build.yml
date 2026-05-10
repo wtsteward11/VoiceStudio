@@ -555,6 +555,9 @@ jobs:
           pip install -r requirements.txt
 
       - name: Run verification checks
+        env:
+          # ubuntu-latest has no WinUI app / startup_decision.json (GAP-069 guard)
+          VOICESTUDIO_SKIP_STARTUP_ARTIFACT_CHECK: "true"
         run: python scripts/run_verification.py
         
       - name: Upload verification report
@@ -585,8 +588,23 @@ jobs:
           python-version: "3.11"
 
       - name: Install NSwag CLI
-        run: dotnet tool install -g NSwag.ConsoleCore || true
-        continue-on-error: true
+        run: |
+          dotnet tool install -g NSwag.ConsoleCore --version 14.7.1 2>$null
+          if ($LASTEXITCODE -ne 0) {
+            dotnet tool update -g NSwag.ConsoleCore --version 14.7.1
+          }
+          nswag version
+
+      # After download, `docs/api/openapi.json` may be replaced by the CI-exported artifact. Comparing
+      # `git show HEAD:` to post-download disk produced spurious deltas; comparing main to artifact
+      # flags legitimate PR-vs-main API drift and fails large feature PRs. Baseline = same file
+      # tree before artifact overwrite; current = after download (must match for this job).
+      - name: Save committed OpenAPI before artifact download
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .buildlogs
+          cp docs/api/openapi.json .buildlogs/openapi-committed.json
 
       - name: Download OpenAPI schema artifact
         uses: actions/download-artifact@v4
@@ -639,15 +657,23 @@ jobs:
         id: contract-check
 
       - name: Detect breaking changes
+        shell: bash
         run: |
+          set -euo pipefail
           python tools/nswag/detect-breaking-changes.py --json > .buildlogs/breaking-changes.json 2>&1 || true
-          python tools/nswag/detect-breaking-changes.py
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            python tools/nswag/detect-breaking-changes.py --baseline .buildlogs/openapi-committed.json --current docs/api/openapi.json
+          else
+            python tools/nswag/detect-breaking-changes.py
+          fi
         # GAP-CI-001: Breaking change detection is important (removed continue-on-error)
         id: breaking-changes
 
       - name: Run Python contract tests
         run: |
-          python -m pip install pytest --quiet
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          python -m pip install pytest pytest-randomly --quiet
           python -m pytest tests/contract/test_openapi_contract.py -v --tb=short
         # GAP-CI-001: Contract tests should fail CI if they fail
         id: python-contract-tests

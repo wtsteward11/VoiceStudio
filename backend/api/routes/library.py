@@ -380,6 +380,13 @@ async def upload_asset(
     file: UploadFile = File(...),
     folder_id: str | None = None,
     tags: str | None = None,
+    metadata_json: str | None = Query(None, description="Optional JSON object merged into asset metadata"),
+    project_id: str | None = Query(None, description="Optional project id for generated-audio provenance"),
+    session_id: str | None = Query(None, description="Optional session id for generated-audio provenance"),
+    generated_audio_id: str | None = Query(None, description="Optional generated-audio id linked to this asset"),
+    source_engine: str | None = Query(None, description="Optional requested/source engine id"),
+    routed_engine: str | None = Query(None, description="Optional routed engine id that produced the asset"),
+    profile_id: str | None = Query(None, description="Optional voice profile id used to produce the asset"),
 ):
     """
     Upload an audio file directly into the library.
@@ -506,6 +513,26 @@ async def upload_asset(
     asset_id = str(uuid.uuid4())
     now = datetime.now()
 
+    extra_metadata: dict[str, object] = {}
+    if metadata_json:
+        try:
+            loaded_metadata = json.loads(metadata_json)
+        except json.JSONDecodeError as exc:
+            raise HTTPException(status_code=400, detail="metadata_json must be valid JSON") from exc
+        if not isinstance(loaded_metadata, dict):
+            raise HTTPException(status_code=400, detail="metadata_json must be a JSON object")
+        extra_metadata.update(loaded_metadata)
+
+    provenance_metadata = {
+        "project_id": project_id,
+        "session_id": session_id,
+        "generated_audio_id": generated_audio_id,
+        "source_engine": source_engine,
+        "routed_engine": routed_engine,
+        "profile_id": profile_id,
+    }
+    extra_metadata.update({k: v for k, v in provenance_metadata.items() if v is not None})
+
     metadata_dict = {
         "original_filename": file.filename,
         "original_path": dest_path if converted else None,
@@ -516,6 +543,7 @@ async def upload_asset(
         "source_format": detected_format or original_ext.lstrip("."),
         "is_video_source": is_video_source,
     }
+    metadata_dict.update(extra_metadata)
 
     entity = LibraryAssetEntity(
         id=asset_id,

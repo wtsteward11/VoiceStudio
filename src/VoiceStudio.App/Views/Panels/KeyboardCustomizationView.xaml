@@ -4,6 +4,8 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:controls="using:VoiceStudio.App.Controls"
     xmlns:converters="using:VoiceStudio.App.Converters"
+    xmlns:vm="using:VoiceStudio.App.ViewModels"
+    x:DataType="vm:KeyboardCustomizationViewModel"
     MaxWidth="600">
     <UserControl.Resources>
         <converters:BooleanToVisibilityConverter x:Key="BoolToVisibilityConverter" />

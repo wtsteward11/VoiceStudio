@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
+import numpy.typing as npt
 
 from backend.core.exceptions import ServiceError
 from backend.services.audio_artifacts.use_cases import (
@@ -60,6 +61,40 @@ def _synth_output_file_ready(path: str | None) -> bool:
         return os.path.getsize(path) > 0
     except OSError:
         return False
+
+
+def _optional_text(value: Any) -> str | None:
+    """Return a trimmed string or None for optional provenance fields."""
+    if value is None:
+        return None
+    text = str(value).strip()
+    return text or None
+
+
+def _generated_audio_metadata(req: Any, engine_id: str, audio_id: str) -> dict[str, Any]:
+    """Build generated-audio provenance metadata for the artifact registry."""
+    metadata: dict[str, Any] = {
+        "generated_audio_id": audio_id,
+        "audio_id": audio_id,
+        "source": "voice_synthesis",
+        "source_engine": _optional_text(getattr(req, "engine", None)) or engine_id,
+        "routed_engine": engine_id,
+        "profile_id": _optional_text(getattr(req, "profile_id", None)),
+    }
+    project_id = _optional_text(getattr(req, "project_id", None))
+    session_id = _optional_text(getattr(req, "session_id", None))
+    if project_id:
+        metadata["project_id"] = project_id
+    if session_id:
+        metadata["session_id"] = session_id
+    return metadata
+
+
+def _record_generated_audio_metadata(req: Any, engine_id: str, audio_id: str) -> None:
+    """Persist generated-audio provenance on an already registered artifact."""
+    from backend.services.audio_registry_service import get_registry
+
+    get_registry().update_metadata(audio_id, _generated_audio_metadata(req, engine_id, audio_id))
 
 
 # Quality optimization
@@ -331,18 +366,24 @@ class SynthesisService:
                     audio_id = f"synth_{req.profile_id}_{uuid.uuid4().hex[:8]}"
                     sample_rate = 22050
                     n_samples = int(sample_rate * 0.25)
-                    silence = np.zeros(n_samples, dtype=np.float32)
+                    silence: npt.NDArray[np.float32] = np.zeros(
+                        n_samples, dtype=np.float32
+                    )
                     create_audio_artifact_from_wav_array(
                         silence,
                         sample_rate,
                         created_by="stub",
                         audio_id=audio_id,
+                        project_id=_optional_text(getattr(req, "project_id", None)),
                         source="ci_golden_loop_stub",
                     )
+                    _record_generated_audio_metadata(req, "stub", audio_id)
                     duration = float(n_samples) / float(sample_rate)
                     return VoiceSynthesizeResponse(
                         audio_id=audio_id,
                         audio_url=f"/api/voice/audio/{audio_id}",
+                        generated_audio_id=audio_id,
+                        profile_id=req.profile_id,
                         duration=duration,
                         quality_score=0.0,
                         quality_metrics=None,
@@ -590,16 +631,19 @@ class SynthesisService:
                                     break
 
                             if isinstance(result, dict) and "audio_id" in result:
+                                result_audio_id = str(result["audio_id"])
+                                routed_engine = str(result.get("routed_engine") or engine_id)
+                                _record_generated_audio_metadata(req, routed_engine, result_audio_id)
                                 return VoiceSynthesizeResponse(
-                                    audio_id=result["audio_id"],
-                                    audio_url=f"/api/voice/audio/{result['audio_id']}",
+                                    audio_id=result_audio_id,
+                                    audio_url=f"/api/voice/audio/{result_audio_id}",
+                                    generated_audio_id=result_audio_id,
+                                    profile_id=req.profile_id,
                                     duration=result.get("duration", 0.0),
                                     quality_score=0.0,
                                     quality_metrics=None,
                                     ssml_handling=ssml_handling,
-                                    routed_engine=str(
-                                        result.get("routed_engine") or engine_id
-                                    ),
+                                    routed_engine=routed_engine,
                                 )
 
                             file_written_early = _synth_output_file_ready(output_path)
@@ -658,11 +702,16 @@ class SynthesisService:
                                     output_path,
                                     created_by=engine_id,
                                     audio_id=audio_id,
+                                    project_id=_optional_text(getattr(req, "project_id", None)),
+                                    source="voice_synthesis",
                                     delete_source=True,
                                 )
+                                _record_generated_audio_metadata(req, engine_id, audio_id)
                                 return VoiceSynthesizeResponse(
                                     audio_id=audio_id,
                                     audio_url=f"/api/voice/audio/{audio_id}",
+                                    generated_audio_id=audio_id,
+                                    profile_id=req.profile_id,
                                     duration=duration,
                                     quality_score=quality_score,
                                     quality_metrics=detailed_metrics,

@@ -1,0 +1,290 @@
+# [Report Title] — [YYYY-MM-DD]
+
+<!-- VOICESTUDIO_PROOF_BOUNDARY_V1
+classification: [REAL_ENGINE | STUB_ENGINE | MOCK_ENGINE | UNKNOWN]
+proof_type: [voice_synthesis | generated_audio | other]
+engine_mode_source: [runtime_probe | test_mode_env | mock_fixture | blocked_unknown | manual_unknown | not_applicable]
+runtime_claim: false
+operator_claim: false
+-->
+
+<!--
+CLASSIFICATION GUIDE
+====================
+REAL_ENGINE   — Real ML engine performed synthesis (e.g. XTTS v2, Piper, eSpeak NG).
+                Requires: routed_engine evidence, artifact size/format, library and timeline evidence.
+STUB_ENGINE   — Stub/test-mode engine (VOICESTUDIO_TEST_MODE=1). Proves orchestration only.
+                Must NOT claim real synthesis. Must include Non-Claims section.
+MOCK_ENGINE   — Mock engine in unit/integration tests. Proves call paths only.
+                Must NOT claim real synthesis. Must include Non-Claims section.
+UNKNOWN       — Engine mode could not be determined (blocker condition).
+                Must include blocker explanation and Non-Claims section.
+-->
+
+**Classification:** [REAL_ENGINE | STUB_ENGINE | MOCK_ENGINE | UNKNOWN]
+**Date:** [YYYY-MM-DD]
+**HEAD:** [git rev-parse HEAD]
+**Purpose:** [One sentence describing what this proof establishes]
+
+---
+
+## 1. Repo Reality
+
+| Field | Value |
+|---|---|
+| HEAD commit | `[hash]` |
+| Branch | `[branch]` |
+| `origin/main` | `[hash]` |
+| Ahead/behind | `[N ahead, M behind]` |
+| Dirty files | [none / list] |
+| JSON proof artifact | `[path/to/proof.json]` |
+
+---
+
+## 2. Engine Mode Classification
+
+**VERDICT:** [REAL_ENGINE | STUB_ENGINE | MOCK_ENGINE | UNKNOWN]
+
+| Evidence Item | Value |
+|---|---|
+| `VOICESTUDIO_TEST_MODE` | [empty — not set / set to value] |
+| Stub gate result | [Not triggered / triggered] |
+| `routed_engine` in synthesis response | `[xtts_v2 / piper / stub / mock]` |
+| Engine readiness probe | [PASS / FAIL / not run] |
+
+<!-- For STUB_ENGINE / MOCK_ENGINE: remove or mark N/A the rows that don't apply -->
+<!-- For UNKNOWN: add a dedicated Blocker section below -->
+
+---
+
+<!-- === REAL_ENGINE SECTIONS (remove for STUB/MOCK/UNKNOWN) === -->
+
+## 3. Environment and Test-Mode Evidence
+
+| Check | Result |
+|---|---|
+| `VOICESTUDIO_TEST_MODE` | _(empty — not set)_ |
+| `_is_voice_studio_stub_test_mode()` | `False` |
+| Engine probe mode | `manifest_scan_plus_full_router` |
+| Probe PASS | YES |
+
+---
+
+## 4. Synthesis Request and Response
+
+**Request:**
+```json
+{
+  "text": "[synthesis text]",
+  "profile_id": "[profile uuid]",
+  "engine": "[engine_name]",
+  "project_id": "[project uuid if product-closure]",
+  "session_id": "[timeline session id if product-closure]"
+}
+```
+
+**Response (HTTP 200):**
+```json
+{
+  "audio_id": "[audio_id]",
+  "generated_audio_id": "[generated_audio_id]",
+  "profile_id": "[profile uuid]",
+  "duration": [seconds],
+  "quality_score": [0.0-1.0],
+  "routed_engine": "[engine_name]",
+  "quality_metrics": {
+    "mos_score": [1.0-5.0],
+    "snr_db": [value]
+  }
+}
+```
+
+---
+
+## 5. Audio Artifact Validation
+
+| Check | Result |
+|---|---|
+| File size | **[N bytes (N KiB)]** |
+| RIFF header (bytes 0–3) | `52 49 46 46` = `"RIFF"` ✓ |
+| WAVE marker (bytes 8–11) | `"WAVE"` ✓ |
+| Content-Type | `audio/wav` |
+| Non-error body | **GET `/api/voice/audio/{audio_id}`** returned **binary audio** (not a JSON error body; does not start with `{`) |
+| SHA-256 | `[lowercase hex digest]` |
+| Sample rate / channels / bits | `[Hz] / [channels] / [bits]` |
+| WAV-derived duration | `[seconds]` |
+| Non-silent analysis | `non_silent=[true/false/unknown]`, `peak_abs_sample=[value]`, `rms=[value]` |
+
+---
+
+## 6. Library Evidence
+
+| Field | Value |
+|---|---|
+| Library asset id | `[uuid]` |
+| `audio_id` (upload_id) | `[uuid]` |
+| Upload HTTP status | **201 Created** |
+
+---
+
+## 7. Timeline Evidence
+
+| Step | Result |
+|---|---|
+| Track created | `[track_uuid]` |
+| Clip added | `[clip_uuid]` |
+| Timeline revision after clip | **[N]** |
+| Clip start/end | `[start]s – [end]s` |
+| Clip metadata | `generated_audio_id=[id]`, `library_asset_id=[id]`, `project_id=[id]`, `session_id=[id]` |
+
+---
+
+## 8. Product-Closure Identity Spine
+
+| Field | Value |
+|---|---|
+| `project.project_id` | `[project_id]` |
+| `project.session_id` | `[session_id]` |
+| `generated_audio.generated_audio_id` | `[generated_audio_id]` |
+| `generated_audio.audio_id` | `[audio_id]` |
+| `generated_audio.library_asset_id` | `[asset_id]` |
+| `generated_audio.timeline_track_id` | `[track_id]` |
+| `generated_audio.timeline_clip_id` | `[clip_id]` |
+| `generated_audio.source_engine` / `routed_engine` | `[requested] / [routed]` |
+| `generated_audio.profile_id` | `[profile_id]` |
+| `generated_audio.artifact_sha256` | `[lowercase hex digest]` |
+
+Validate with:
+
+```powershell
+python scripts/ci/check_generated_audio_identity_spine.py --proof-json [proof.json]
+```
+
+---
+
+## 9. Export Evidence (or Non-Claim)
+
+| Field | Value |
+|---|---|
+| `export.claimed` | `[true / false]` |
+| Export path | `[path]` |
+| Export SHA-256 | `[lowercase hex digest]` |
+| Export size | `[N bytes]` |
+| Export container | `[RIFF/WAVE]` |
+| Export non-silent | `[true / false]` |
+| Export WAV-derived duration | `[seconds]` |
+
+Export must be a non-claim unless `POST /api/timeline/export` succeeded and the exported WAV passed automated forensic validation.
+
+---
+
+## 10. Automated Replay Validation
+
+| Field | Value |
+|---|---|
+| Replay target | `[audio path / audio URL / proof JSON]` |
+| Decode result | `[pass / fail]` |
+| Non-silent | `[true / false]` |
+| Sample rate / channels | `[Hz] / [channels]` |
+| Duration | `[seconds]` |
+
+Use "automated replay validation" terminology. Do not claim the audio was heard unless this report includes an explicit operator claim and attestation.
+
+```powershell
+python scripts/proof/verify_generated_audio_replay.py --proof-json [proof.json] --json
+```
+
+---
+
+## 11. Durability Evidence (or Non-Claim)
+
+<!-- Either add durability checks, or explicitly state this is out of scope: -->
+
+| Field | Value |
+|---|---|
+| `durability.claimed` | `[true / false]` |
+| `restart_performed` | `[true / false]` |
+| `reload_verified` | `[true / false]` |
+| Blocker / non-claim | `[restart not performed / reload verified / reason]` |
+
+Durability must be a non-claim unless automated restart + reload evidence exists.
+
+```powershell
+python scripts/proof/verify_backend_restart_durability.py --proof-json [proof.json] --restart-command "[command]" --json
+```
+
+---
+
+<!-- === END REAL_ENGINE SECTIONS === -->
+
+<!-- === STUB/MOCK ENGINE SECTIONS === -->
+
+## 3. Orchestration Evidence
+
+| Check | Result |
+|---|---|
+| `VOICESTUDIO_TEST_MODE` | `1` (stub mode) |
+| Synthesis API call | HTTP 200 (stub response) |
+| `routed_engine` | `stub` |
+
+[Stub/mock engine was active. No real audio was generated.]
+
+---
+
+<!-- === END STUB/MOCK ENGINE SECTIONS === -->
+
+<!-- === UNKNOWN BLOCKER SECTION === -->
+
+## 3. Blocker Evidence
+
+**Engine mode could not be determined.**
+
+| Blocker | Description |
+|---|---|
+| Reason | [could not determine / backend unreachable / unavailable] |
+| Attempted checks | [list what was tried] |
+| Resolution | [what is needed to unblock] |
+
+---
+
+<!-- === END UNKNOWN BLOCKER SECTION === -->
+
+## 12. Verification Commands
+
+```powershell
+# Validator (run before commit)
+python scripts/ci/check_voice_synthesis_proof_boundary.py --changed-from origin/main
+python scripts/ci/check_voice_synthesis_proof_json.py --path [proof.json] --product-closure
+python scripts/ci/check_generated_audio_identity_spine.py --proof-json [proof.json]
+
+# Gate status
+python scripts/run_verification.py
+
+# Quick verification
+.\scripts\verify.ps1 -Quick
+```
+
+**Validator output:**
+```
+[voice_synthesis_proof_boundary] Checked 1 report(s) ...
+[voice_synthesis_proof_boundary] All 1 report(s) PASS
+```
+
+---
+
+## 13. Explicit Non-Claims
+
+- [Describe what this report does NOT prove]
+- This is NOT a runtime FULL PASS
+- This is NOT an operator/human proof
+- This is NOT restart durability unless restart + reload checks passed
+- [NOT GAP-008 / NOT Slice 46 / NOT MainWindow*ShellBridge — if applicable]
+- [NOT RHVoice / NOT ENGINE_PARITY_MATRIX — if applicable]
+
+---
+
+## 14. Final Verdict
+
+**VERDICT: [REAL_ENGINE | STUB_ENGINE | MOCK_ENGINE | UNKNOWN]**
+
+[One or two sentences summarising what this proof establishes and its limitations.]

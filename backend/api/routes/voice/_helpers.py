@@ -24,7 +24,6 @@ from backend.ml.models.model_preflight import (
     ensure_sovits,
     ensure_xtts,
 )
-from backend.platform.config.unified_config import get_config
 from backend.services.audio_artifacts.use_cases import (
     create_audio_artifact_from_file,
     create_audio_artifact_from_wav_array,
@@ -382,63 +381,6 @@ async def _resolve_profile_audio(
         )
 
     return profile_audio_path
-
-
-def _select_engine_with_fallback(
-    requested_engine: str,
-    valid_engines: list[str],
-) -> str:
-    """
-    Select an engine with fallback chain if requested engine is unavailable.
-
-    GAP-PY-005: Fallback chain is now loaded from config/engines.config.yaml
-    instead of being hardcoded.
-
-    Args:
-        requested_engine: The engine requested by the user
-        valid_engines: List of available engine IDs
-
-    Returns:
-        The selected engine ID (may be a fallback)
-
-    Raises:
-        InvalidEngineException: If no valid engine is available
-    """
-    engine_id = _normalize_engine_id(requested_engine)
-
-    if valid_engines and engine_id not in valid_engines:
-        # GAP-PY-005: Load fallback chain from config
-        try:
-            fallback_chain = get_config().get_fallback_chain("tts")
-        except Exception as e:
-            logger.warning(f"Failed to load fallback chain from config: {e}")
-            fallback_chain = []
-
-        # Default fallback chain if config is empty or unavailable
-        if not fallback_chain:
-            fallback_chain = ["xtts_v2", "xtts", "piper", "espeak_ng"]
-
-        original_engine_id = engine_id
-
-        for fallback_engine in fallback_chain:
-            if fallback_engine in valid_engines:
-                engine_id = fallback_engine
-                logger.info(
-                    f"Engine '{original_engine_id}' not available, "
-                    f"falling back to '{fallback_engine}'"
-                )
-                return str(fallback_engine)
-
-        # No fallback available
-        engines_str = ", ".join(valid_engines) if valid_engines else "none (engines not loaded)"
-        raise InvalidEngineException(
-            engine=requested_engine,
-            available_engines=(
-                engines_str.split(", ") if engines_str != "none (engines not loaded)" else []
-            ),
-        )
-
-    return str(engine_id)
 
 
 async def _perform_synthesis_with_retry(

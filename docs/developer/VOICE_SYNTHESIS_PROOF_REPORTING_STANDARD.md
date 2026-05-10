@@ -1,0 +1,379 @@
+# Voice Synthesis Proof Reporting Standard
+
+**Version:** 1.0
+**Date:** 2026-04-29
+**Owner:** Verification gate `voice_synthesis_proof_boundary`
+**Validator:** `scripts/ci/check_voice_synthesis_proof_boundary.py`
+**Template:** `docs/templates/VOICE_SYNTHESIS_PROOF_REPORT_TEMPLATE.md`
+
+---
+
+## Purpose
+
+This standard prevents mock/stub engine results from being treated as real synthesis proof.
+Every proof report named `VOICE_SYNTHESIS*.md`, `GENERATED_AUDIO*.md`, or
+`REAL_ENGINE_GENERATED_AUDIO*.md` under `docs/reports/verification/` must satisfy
+the rules in this document. The CI gate enforces them on every new or changed report.
+
+---
+
+## Required Metadata Block
+
+Every relevant proof report must include a `VOICESTUDIO_PROOF_BOUNDARY_V1` metadata block
+near the top, before the first heading section:
+
+```markdown
+<!-- VOICESTUDIO_PROOF_BOUNDARY_V1
+classification: REAL_ENGINE
+proof_type: voice_synthesis
+engine_mode_source: runtime_probe
+runtime_claim: false
+operator_claim: false
+-->
+```
+
+### Required fields
+
+| Field | Allowed values |
+|---|---|
+| `classification` | `REAL_ENGINE`, `STUB_ENGINE`, `MOCK_ENGINE`, `UNKNOWN` |
+| `proof_type` | `voice_synthesis`, `generated_audio`, `proof_boundary`, `other` |
+| `engine_mode_source` | `runtime_probe`, `test_mode_env`, `mock_fixture`, `blocked_unknown`, `manual_unknown`, `not_applicable` |
+| `runtime_claim` | `true` or `false` |
+| `operator_claim` | `true` or `false` |
+
+### Constraint: classification must match
+
+The `classification` field in the metadata block must match the textual `Classification:` or
+`VERDICT:` line in the report body. Mismatches are a CI violation.
+
+---
+
+## Classification Definitions
+
+### REAL_ENGINE
+
+The real ML inference engine (e.g. XTTS v2, Piper, eSpeak NG) performed synthesis.
+`VOICESTUDIO_TEST_MODE` was not set. `routed_engine` in the API response names a
+non-stub engine. Audio artifact has been validated (RIFF/WAV header, non-zero size).
+Library save and timeline placement have been confirmed.
+
+**What it proves:** The synthesis path from API → engine → audio artifact → library → timeline
+operated with a real model at the time of the proof run.
+
+**What it does NOT prove (must be listed in Non-Claims):**
+- Runtime FULL PASS (full suite across all engines)
+- Operator/human proof (heard and attested by a human)
+- Durability (data persists across restarts) unless explicitly tested
+- Performance/latency guarantees
+- Other engine parity (RHVoice, ENGINE_PARITY_MATRIX, etc.)
+
+### STUB_ENGINE
+
+`VOICESTUDIO_TEST_MODE=1` or equivalent stub path was active. The synthesis route
+was exercised but no real ML model was used. `routed_engine` may be `stub` or absent.
+
+**What it proves:** Orchestration path (API → stub handler → response) executed without error.
+
+**What it does NOT prove:** Real synthesis, real audio quality, real engine routing.
+
+### MOCK_ENGINE
+
+A mock engine fixture was injected in a test environment (unit/integration test).
+No real HTTP backend was involved.
+
+**What it proves:** The code path under test (ViewModel, service, route) called the
+engine interface correctly and handled the response.
+
+**What it does NOT prove:** Runtime synthesis, real HTTP integration, real audio.
+
+### UNKNOWN
+
+Engine mode could not be determined. This is a blocker condition — the report must
+explain why verification could not complete.
+
+**What it proves:** Nothing about synthesis. Documents the failure to determine engine mode.
+
+---
+
+## Required Non-Claims Section
+
+Every relevant report must contain a Non-Claims section with one of these headings:
+
+- `## Explicit Non-Claims`
+- `## Non-Claims`
+- `## Mock/Stub Non-Claims`
+- `## Boundaries`
+- `## Proof Boundary`
+- `## What This Does Not Prove`
+
+The section must list what the report does NOT establish. At minimum:
+- Whether this is a runtime FULL PASS
+- Whether this is an operator/human proof
+- Whether this covers engines not tested
+
+---
+
+## REAL_ENGINE Evidence Requirements
+
+A `REAL_ENGINE`-classified report must include all of:
+
+| Evidence | Accepted terms (outside Non-Claims) |
+|---|---|
+| `routed_engine` field | `routed_engine` present and non-stub |
+| Artifact size | `bytes`, `KiB`, `MiB` |
+| Artifact format | `RIFF`, `WAV`, `WAVE`, `header` |
+| Non-error audio body | `not a JSON error body`, `binary audio`, `does not start with {` |
+| Library evidence | `HTTP 201`, `asset_id`, `library asset`, `audio_id`, `/api/library/` |
+| Timeline evidence | `clip_id`, `track_id`, `start_time`, `end_time`, `timeline revision`, `/api/timeline/` |
+
+**Negative-only evidence is rejected** when it appears **outside** Non-Claims. Phrases like
+"no library evidence", "timeline not tested", "library unavailable" fail unless they appear only
+under an explicit Non-Claims heading (those sections are blanked before positive/negative checks).
+
+### Metadata semantics
+
+- Exactly **one** `VOICESTUDIO_PROOF_BOUNDARY_V1` block; duplicate blocks or duplicate keys fail CI.
+- `classification`, `proof_type`, and `engine_mode_source` must match the allowed vocabularies.
+- If `operator_claim: true`, the body (outside Non-Claims) must contain operator-oriented evidence
+  (`operator`, `manual`, `heard`, `attestation`, `playback confirmed`).
+- If `runtime_claim: true`, the body (outside Non-Claims) must contain one of:
+  `runtime FULL PASS`, `full runtime`, `end-to-end runtime`.
+
+---
+
+## Generating a proof with the harness
+
+Use `scripts/proof/run_voice_synthesis_real_engine_proof.py` to emit JSON + Markdown that is
+pre-validated with `validate_report()`:
+
+```powershell
+python scripts/proof/run_voice_synthesis_real_engine_proof.py --dry-run-fixtures --output-dir artifacts/proof_harness_selftest
+```
+
+Product-closure mode extends the proof from synthesis to project authority:
+
+```powershell
+python scripts/proof/run_voice_synthesis_real_engine_proof.py --product-closure --project-id <project_id> --project-name <name> --export-timeline --verify-reload
+```
+
+Dry-run requires **no backend**. Real mode is opt-in and targets the local FastAPI routes documented
+in [VOICE_SYNTHESIS_REAL_ENGINE_PROOF_HARNESS_2026-04-29.md](../reports/verification/VOICE_SYNTHESIS_REAL_ENGINE_PROOF_HARNESS_2026-04-29.md).
+
+---
+
+## JSON Proof Schema
+
+Harness JSON proof artifacts use `schemas/voice_synthesis_proof.schema.json` and `schema_version: "voice_synthesis_proof.v1"`.
+
+Required top-level fields include `git`, `classification`, `proof_type`, `engine_mode_source`, `requested_engine`, `routed_engine`, `environment`, `backend`, `profile`, `synthesis`, `audio_artifact`, `library`, `timeline`, `durability`, `non_claims`, and `verdict`.
+
+Product-closure JSON proofs also populate `project`, `generated_audio`, and `export`. These sections carry the identity spine from project/session to generated audio, library asset, timeline clip, and exported WAV evidence.
+
+Validate JSON proofs with:
+
+```powershell
+python scripts/ci/check_voice_synthesis_proof_json.py --path <proof.json>
+python scripts/ci/check_voice_synthesis_proof_json.py --dir docs/reports/verification/runtime_proofs
+python scripts/ci/check_voice_synthesis_proof_json.py --path <proof.json> --product-closure
+python scripts/ci/check_voice_synthesis_proof_json.py --self-test-examples
+```
+
+The validator enforces semantic rules that are intentionally clearer than JSON Schema alone: `REAL_ENGINE` cannot route to stub/mock/test, UNKNOWN requires blockers, durability claims require restart/reload evidence, and SHA-256 must be lowercase hex.
+
+Use `scripts/ci/check_generated_audio_identity_spine.py` for identity graph validation:
+
+```powershell
+python scripts/ci/check_generated_audio_identity_spine.py --proof-json <proof.json>
+python scripts/ci/check_generated_audio_identity_spine.py --self-test-examples
+```
+
+---
+
+## Audio Forensic Requirements
+
+`REAL_ENGINE` JSON proofs must include WAV forensic evidence from `scripts/proof/audio_forensics.py`:
+
+- `size_bytes > 1024`
+- `sha256`
+- `header_hex`
+- `container` containing `RIFF/WAVE`
+- `not_json_error_body: true`
+- sample rate, channels, bits per sample, data chunk size
+- WAV-derived duration
+- `non_silent: true` with peak/RMS values
+
+If non-silence cannot be proven, classify the proof as `UNKNOWN` with a blocker instead of claiming `REAL_ENGINE`.
+
+---
+
+## Generated Audio Product-Closure Requirements
+
+Product closure is stronger than real-engine synthesis. A product-closure proof must show:
+
+- `project.project_id` and a consistent `session_id`.
+- `generated_audio.generated_audio_id` linked to `synthesis.audio_id`.
+- `generated_audio.library_asset_id` linked to the library response.
+- `generated_audio.timeline_track_id` and `generated_audio.timeline_clip_id` linked to timeline state.
+- `generated_audio.artifact_sha256` matching `audio_artifact.sha256`.
+- `export.claimed=true` only when export WAV forensic evidence exists.
+- Automated replay/decode validation, not human listening language.
+
+Automated replay validation is performed with:
+
+```powershell
+python scripts/proof/verify_generated_audio_replay.py --audio-path <generated.wav> --json
+python scripts/proof/verify_generated_audio_replay.py --proof-json <proof.json> --json
+```
+
+Reports must say "automated replay validation" or "decode validation"; they must not claim the audio was heard unless `operator_claim: true` and human attestation evidence is present.
+
+---
+
+## Durability Claim Requirements
+
+Default harness runs must set `durability.claimed=false`. Durability can be claimed only when:
+
+- `--verify-durability` is used,
+- `--restart-backend-command` is explicitly supplied,
+- the restart command exits 0, and
+- audio, library, and timeline reload checks pass after restart.
+
+Replay checks without restart are useful evidence, but they are not restart durability proof.
+
+For product-closure restart durability, use:
+
+```powershell
+python scripts/proof/verify_backend_restart_durability.py --proof-json <proof.json> --restart-command "<command>" --json
+```
+
+If `--restart-command` is absent, the output must remain a non-claim with an explicit blocker.
+
+---
+
+## Proof Bundle Index
+
+Use `scripts/proof/index_voice_synthesis_proofs.py` to summarize JSON proof bundles:
+
+```powershell
+python scripts/proof/index_voice_synthesis_proofs.py --dir docs/reports/verification/runtime_proofs --output docs/reports/verification/runtime_proofs/index.json --strict
+```
+
+The index records latest proof, latest `REAL_ENGINE`, latest `UNKNOWN`, counts by classification, schema versions, proof files, and validation status.
+
+---
+
+## UNKNOWN Blocker Requirement
+
+An `UNKNOWN`-classified report must contain explicit blocker language outside the
+classification line. Accepted terms:
+
+`blocker`, `blocked`, `could not determine`, `unable to determine`, `engine mode unknown`,
+`unavailable`, `missing evidence`, `verification could not complete`, `automatic verification failed`
+
+---
+
+## Forbidden Overclaim Patterns
+
+The following phrases are forbidden outside Non-Claims sections in STUB_ENGINE, MOCK_ENGINE,
+and UNKNOWN reports:
+
+| Forbidden phrase | Why |
+|---|---|
+| `REAL_ENGINE confirmed` | False classification claim |
+| `real synthesis proof` | Overclaims synthesis quality |
+| `real engine generated audio proof` | Overclaims real-engine proof |
+| `actual model output confirmed` | Overclaims ML inference |
+| `real model output` | Overclaims ML inference |
+| `non-stub synthesis confirmed` | Overclaims real synthesis |
+| `runtime proof complete` | Overclaims runtime coverage |
+| `runtime FULL PASS` | Reserved for full runtime verification |
+| `operator proof complete` | Requires human attestation |
+| `heard attestation` | Requires human attestation |
+| `manual playback confirmed` | Requires human attestation |
+
+These phrases are allowed only inside an explicit Non-Claims section (to negate them).
+
+---
+
+## Running the Validator
+
+```powershell
+# Changed-from mode (CI default — checks new/changed/staged/untracked reports)
+python scripts/ci/check_voice_synthesis_proof_boundary.py --changed-from origin/main
+
+# All mode (checks all relevant reports, including pre-existing — for audits)
+python scripts/ci/check_voice_synthesis_proof_boundary.py --all
+
+# JSON output
+python scripts/ci/check_voice_synthesis_proof_boundary.py --json --changed-from origin/main
+
+# Self-test (validate built-in examples, quick sanity check)
+python scripts/ci/check_voice_synthesis_proof_boundary.py --self-test-examples
+```
+
+Exit 0 = pass. Exit 1 = violations.
+
+---
+
+## How Changed-File Mode Works
+
+The CI gate uses `--changed-from origin/main`. This mode collects the union of:
+
+1. **Committed delta** — `git diff --name-only --diff-filter=ACM origin/main..HEAD`
+2. **Staged changes** — `git diff --name-only --cached --diff-filter=ACM`
+3. **Unstaged changes** — `git diff --name-only --diff-filter=ACM`
+4. **Untracked files** — `git ls-files --others --exclude-standard docs/reports/verification/`
+
+Only files matching the relevant name patterns under `docs/reports/verification/` are checked.
+Guard/meta-reports (filenames containing `PROOF_BOUNDARY`, `PROOF_HARNESS`, `PROOF_DURABILITY`, `PROOF_SCHEMA`, `_BOUNDARY_GUARD`, `_GUARD_`) are excluded.
+
+---
+
+## Historical Compatibility
+
+Pre-existing reports committed before the `voice_synthesis_proof_boundary` gate was introduced
+(`20f700b2`, 2026-04-29) are not retroactively checked by the default CI gate
+(`--changed-from origin/main`). Only reports added or modified after that point are subject to
+the standard. Use `--all` to audit all historical reports.
+
+---
+
+## Excluded Reports (Guard/Meta)
+
+Files matching these name patterns are excluded even if they start with `VOICE_SYNTHESIS`:
+- `*PROOF_BOUNDARY*`
+- `*PROOF_HARNESS*`
+- `*PROOF_DURABILITY*`
+- `*PROOF_SCHEMA*`
+- `*_BOUNDARY_GUARD*`
+- `*_GUARD_*`
+
+This prevents the guard documentation report itself from needing to classify itself.
+
+---
+
+## Proof Freshness (Runtime Truth v1)
+
+**Validator:** `scripts/ci/check_proof_freshness.py`
+
+### Committed-HEAD Proof Freshness
+Proof JSON files with `schema_version: voice_synthesis_proof.v1` must have `git.head` matching the current `git rev-parse HEAD`. If not, the validator reports `STALE_PROOF_HEAD`.
+
+### Historical Proof Policy
+Proofs from older commits may be marked `historical: true` with the correct generation commit SHA in `git.head`. The validator skips HEAD-matching for historical proofs but flags a contradiction if `historical: true` and `git.head` matches current HEAD.
+
+### Dirty-Proof Policy
+Proofs generated with a dirty working tree are flagged as `DIRTY_PROOF_NOT_ALLOWED` unless:
+- The validator is run with `--allow-dirty-proof`, AND
+- The proof JSON includes a `dirty_proof_policy` field documenting the non-claim.
+
+### Verification-Artifact Freshness
+Use `scripts/ci/check_verification_evidence_freshness.py` to validate that referenced artifacts exist and are non-empty.
+
+### Product-Closure Proof Expectations
+Product-closure proofs (`--product-closure` flag) must additionally satisfy:
+- Library ownership (`library.library_id` present)
+- Timeline placement evidence (`timeline.clip_id`, `timeline.track_id`)
+- Export/replay artifact reference
+- Quality metrics with non-placeholder values

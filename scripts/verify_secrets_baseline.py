@@ -20,6 +20,7 @@ Exit Codes:
 import argparse
 import json
 import logging
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -34,7 +35,7 @@ logger = logging.getLogger(__name__)
 REPO_ROOT = Path(__file__).parent.parent
 BASELINE_FILE = REPO_ROOT / ".secrets.baseline"
 
-# Files/patterns to exclude from scan (beyond what's in baseline config)
+# Path substrings excluded from detect-secrets (heavy or non-source); passed as --exclude-files regex.
 ADDITIONAL_EXCLUDES = [
     ".venv",
     "venv",
@@ -43,7 +44,18 @@ ADDITIONAL_EXCLUDES = [
     "__pycache__",
     ".git",
     ".buildlogs",
+    "artifacts",
+    "bin",
+    "obj",
+    "backend/data",
+    "installer/runtime",
+    "src/VoiceStudio.App/Services/Generated",
 ]
+
+
+def _exclude_files_regex() -> str:
+    """Regex for detect-secrets --exclude-files (substring match on paths)."""
+    return "|".join(re.escape(fragment) for fragment in ADDITIONAL_EXCLUDES)
 
 
 def load_baseline() -> dict:
@@ -56,9 +68,44 @@ def load_baseline() -> dict:
         return json.load(f)
 
 
+def _git_tracked_files_for_secrets_scan() -> list[str]:
+    """
+    Return git-cached paths to scan (forward slashes), excluding heavy paths.
+
+    Scoping to tracked files keeps CI deterministic and avoids scanning checkout
+    artifacts or huge vendored trees that are already excluded via regex.
+    """
+    exclude_re = re.compile(_exclude_files_regex())
+    ls = subprocess.run(
+        ["git", "ls-files", "--cached"],
+        cwd=str(REPO_ROOT),
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if ls.returncode != 0:
+        logger.error("git ls-files failed: %s", ls.stderr.strip())
+        return []
+
+    paths: list[str] = []
+    for raw in ls.stdout.splitlines():
+        line = raw.strip()
+        if not line:
+            continue
+        normalized = line.replace("\\", "/")
+        if exclude_re.search(normalized):
+            continue
+        paths.append(line)
+    return paths
+
+
 def run_secrets_scan(update_baseline: bool = False) -> tuple[int, str, str]:
     """
     Run detect-secrets scan against the repository.
+
+    Normal mode scans only git-tracked files (batched) for predictable CI runtime.
+    ``--update`` uses a single full-repo scan so the developer baseline refresh
+    matches ``detect-secrets`` defaults.
 
     Args:
         update_baseline: If True, update the baseline with new findings
@@ -66,31 +113,89 @@ def run_secrets_scan(update_baseline: bool = False) -> tuple[int, str, str]:
     Returns:
         Tuple of (return_code, stdout, stderr)
     """
-    cmd = ["detect-secrets", "scan"]
-
-    if BASELINE_FILE.exists():
-        cmd.extend(["--baseline", str(BASELINE_FILE)])
+    exclude_regex = _exclude_files_regex()
 
     if update_baseline:
+        cmd = ["detect-secrets", "scan"]
+        if BASELINE_FILE.exists():
+            cmd.extend(["--baseline", str(BASELINE_FILE)])
         cmd.append("--update")
+        cmd.extend(["--exclude-files", exclude_regex])
+        logger.info("Running (baseline update, full tree): %s", " ".join(cmd))
+        try:
+            result = subprocess.run(
+                cmd,
+                cwd=str(REPO_ROOT),
+                capture_output=True,
+                text=True,
+                timeout=600,
+            )
+            return result.returncode, result.stdout, result.stderr
+        except subprocess.TimeoutExpired:
+            logger.error("Secrets scan timed out after 10 minutes")
+            return 2, "", "Timeout"
+        except (OSError, subprocess.SubprocessError) as e:
+            logger.error("Error running detect-secrets: %s", e)
+            return 2, "", str(e)
 
-    logger.info(f"Running: {' '.join(cmd)}")
+    tracked = _git_tracked_files_for_secrets_scan()
+    if not tracked:
+        return 2, "", "No tracked files to scan (git ls-files empty or failed)"
 
-    try:
-        result = subprocess.run(
-            cmd,
-            cwd=str(REPO_ROOT),
-            capture_output=True,
-            text=True,
-            timeout=600,  # 10 minute timeout
+    batch_size = 200
+    merged: dict = {"results": {}}
+    stderr_parts: list[str] = []
+
+    for start in range(0, len(tracked), batch_size):
+        batch = tracked[start : start + batch_size]
+        cmd = ["detect-secrets", "scan"]
+        if BASELINE_FILE.exists():
+            cmd.extend(["--baseline", str(BASELINE_FILE)])
+        cmd.extend(["--exclude-files", exclude_regex])
+        cmd.extend(batch)
+        logger.debug(
+            "detect-secrets batch %s..%s (%s files)",
+            start,
+            start + len(batch) - 1,
+            len(batch),
         )
-        return result.returncode, result.stdout, result.stderr
-    except subprocess.TimeoutExpired:
-        logger.error("Secrets scan timed out after 10 minutes")
-        return 2, "", "Timeout"
-    except Exception as e:
-        logger.error(f"Error running detect-secrets: {e}")
-        return 2, "", str(e)
+        try:
+            result = subprocess.run(
+                cmd,
+                cwd=str(REPO_ROOT),
+                capture_output=True,
+                text=True,
+                timeout=600,
+            )
+        except subprocess.TimeoutExpired:
+            logger.error("Secrets scan timed out after 10 minutes")
+            return 2, "", "Timeout"
+        except (OSError, subprocess.SubprocessError) as e:
+            logger.error("Error running detect-secrets: %s", e)
+            return 2, "", str(e)
+
+        if result.returncode not in (0, 1):
+            logger.error(
+                "detect-secrets batch failed rc=%s stderr=%s",
+                result.returncode,
+                result.stderr,
+            )
+            return result.returncode, result.stdout, result.stderr
+        if result.stderr:
+            stderr_parts.append(result.stderr)
+        if not result.stdout.strip():
+            continue
+        try:
+            chunk = json.loads(result.stdout)
+        except json.JSONDecodeError as e:
+            logger.error("Invalid JSON from detect-secrets: %s", e)
+            return 2, result.stdout, result.stderr
+        for path, findings in chunk.get("results", {}).items():
+            merged["results"].setdefault(path, [])
+            merged["results"][path].extend(findings)
+
+    combined_stdout = json.dumps(merged)
+    return 0, combined_stdout, "\n".join(stderr_parts)
 
 
 def compare_results(

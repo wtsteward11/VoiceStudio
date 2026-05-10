@@ -6,8 +6,11 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using VoiceStudio.App.Core.Models;
+using VoiceStudio.App.Core.Services;
 using VoiceStudio.App.Services;
 using VoiceStudio.App.Tests.Fixtures;
+using VoiceStudio.App.UseCases;
 using VoiceStudio.App.ViewModels;
 using VoiceStudio.App.Views.Panels;
 using VoiceStudio.Core.Events;
@@ -29,6 +32,8 @@ namespace VoiceStudio.App.Tests.ViewModels
   {
     private Mock<ITranscriptionClient> _mockTranscriptionClient = null!;
     private Mock<IProjectAudioClient> _mockProjectAudioClient = null!;
+    private Mock<IDialogueServiceClient> _mockDialogueClient = null!;
+    private Mock<ITimelineUseCase> _mockTimelineUseCase = null!;
     private IViewModelContext _context = null!;
     private DispatcherQueueController? _dispatcherController;
 
@@ -51,13 +56,36 @@ namespace VoiceStudio.App.Tests.ViewModels
       _mockProjectAudioClient
           .Setup(x => x.SaveAudioToProjectAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
           .ReturnsAsync(new ProjectAudioFile { Filename = "stub.wav" });
+      _mockDialogueClient = new Mock<IDialogueServiceClient>();
+      _mockTimelineUseCase = new Mock<ITimelineUseCase>();
       _mockTranscriptionClient
           .Setup(x => x.ListTranscriptionsAsync(It.IsAny<string?>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
           .ReturnsAsync(new List<TranscriptionResponse>());
     }
 
     private TranscribeViewModel CreateSut() =>
+        new TranscribeViewModel(
+            _context,
+            _mockTranscriptionClient.Object,
+            _mockProjectAudioClient.Object,
+            null,
+            null,
+            _mockDialogueClient.Object,
+            _mockTimelineUseCase.Object);
+
+    /// <summary>No dialogue client injection: uses AppServices resolution (null in this harness).</summary>
+    private TranscribeViewModel CreateSutWithoutDialogueClient() =>
         new TranscribeViewModel(_context, _mockTranscriptionClient.Object, _mockProjectAudioClient.Object);
+
+    private TranscribeViewModel CreateSutWithoutTimelineUseCase() =>
+        new TranscribeViewModel(
+            _context,
+            _mockTranscriptionClient.Object,
+            _mockProjectAudioClient.Object,
+            null,
+            null,
+            _mockDialogueClient.Object,
+            null);
 
     [TestCleanup]
     public void Cleanup()
@@ -221,6 +249,43 @@ namespace VoiceStudio.App.Tests.ViewModels
       agg.Publish(new AssetAddedEvent("import-workflow", "playback-id-42", "audio", @"C:\in.wav"));
       await PumpDispatcherQueueAsync();
       Assert.AreEqual("playback-id-42", vm.SelectedAudioId);
+    }
+
+    /// <summary>
+    /// Source audio import: playback id from library upload (same as ImportWorkflowService
+    /// after GetPlaybackAudioId) must flow into durable transcription job request.
+    /// </summary>
+    [TestMethod]
+    public async Task ImportWorkflow_UploadedAsset_AudioId_FeedsTranscriptionJob()
+    {
+      TranscriptionJobRequest? captured = null;
+      _mockTranscriptionClient
+          .Setup(x => x.StartTranscriptionJobAsync(It.IsAny<TranscriptionJobRequest>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+          .Callback<TranscriptionJobRequest, string?, CancellationToken>((req, _, _) => captured = req)
+          .ReturnsAsync(
+              new TranscriptionJobResponse
+              {
+                JobId = "j-import",
+                Status = "pending",
+                Mode = "real",
+              });
+
+      var vm = CreateSut();
+      await vm.InitializeAsync(CancellationToken.None);
+
+      var agg = AppServices.TryGetEventAggregator();
+      Assert.IsNotNull(agg);
+      agg.Publish(new AssetAddedEvent("import-workflow", "lib-file-uuid-1", "audio", @"C:\src.wav"));
+      await PumpDispatcherQueueAsync();
+
+      Assert.AreEqual("lib-file-uuid-1", vm.SelectedAudioId);
+
+      await vm.StartJobCommand.ExecuteAsync(null);
+      await PumpDispatcherQueueAsync().ConfigureAwait(false);
+
+      Assert.IsNotNull(captured);
+      Assert.AreEqual("lib-file-uuid-1", captured.AudioId);
+      Assert.IsTrue(captured.AsyncMode);
     }
 
     /// <summary>
@@ -719,6 +784,689 @@ namespace VoiceStudio.App.Tests.ViewModels
       Assert.IsNotNull(vm.SelectedTranscription);
       Assert.AreEqual(1, vm.SelectedTranscription.Segments.Count);
       Assert.AreEqual("backend never received edit", vm.SelectedTranscription.Segments[0].Text);
+    }
+
+    [TestMethod]
+    public async Task StartJobCommand_SendsAudioId()
+    {
+      TranscriptionJobRequest? captured = null;
+      _mockTranscriptionClient
+          .Setup(x => x.StartTranscriptionJobAsync(It.IsAny<TranscriptionJobRequest>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+          .Callback<TranscriptionJobRequest, string?, CancellationToken>((req, _, _) => captured = req)
+          .ReturnsAsync(
+              new TranscriptionJobResponse
+              {
+                JobId = "j1",
+                Status = "completed",
+                Mode = "real",
+                IsSimulated = false,
+                RealTranscriptionPerformed = true,
+                Transcript = new TranscriptionResponse
+                {
+                  Id = "tr-send",
+                  Text = "x",
+                  Created = DateTime.UtcNow,
+                  Segments = new List<TranscriptionSegment>(),
+                },
+              });
+
+      var vm = CreateSut();
+      await vm.InitializeAsync(CancellationToken.None);
+      vm.SelectedAudioId = "audio-job-send";
+      await vm.StartJobCommand.ExecuteAsync(null);
+      await PumpDispatcherQueueAsync().ConfigureAwait(false);
+
+      Assert.IsNotNull(captured);
+      Assert.AreEqual("audio-job-send", captured.AudioId);
+      Assert.IsTrue(captured.AsyncMode);
+    }
+
+    [TestMethod]
+    public async Task StartJob_RealCompleted_StoresTranscript()
+    {
+      var tr = new TranscriptionResponse
+      {
+        Id = "tr-real-job",
+        Text = "hello",
+        Created = DateTime.UtcNow,
+        Segments = new List<TranscriptionSegment>(),
+      };
+      _mockTranscriptionClient
+          .Setup(x => x.StartTranscriptionJobAsync(It.IsAny<TranscriptionJobRequest>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+          .ReturnsAsync(
+              new TranscriptionJobResponse
+              {
+                JobId = "j-real",
+                Status = "completed",
+                Mode = "real",
+                IsSimulated = false,
+                RealTranscriptionPerformed = true,
+                Transcript = tr,
+              });
+      _mockTranscriptionClient
+          .Setup(x => x.ListTranscriptionsAsync("aud-real", It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+          .ReturnsAsync(new List<TranscriptionResponse> { tr });
+
+      var vm = CreateSut();
+      await vm.InitializeAsync(CancellationToken.None);
+      vm.SelectedAudioId = "aud-real";
+      await vm.StartJobCommand.ExecuteAsync(null);
+      await PumpDispatcherQueueAsync().ConfigureAwait(false);
+
+      Assert.IsNotNull(vm.SelectedTranscription);
+      Assert.AreEqual("tr-real-job", vm.SelectedTranscription.Id);
+    }
+
+    [TestMethod]
+    public async Task StartJob_SimulatedCompleted_StoresTranscriptAndSetsFlag()
+    {
+      var tr = new TranscriptionResponse
+      {
+        Id = "tr-sim",
+        Text = "sim",
+        Created = DateTime.UtcNow,
+        Segments = new List<TranscriptionSegment>(),
+      };
+      _mockTranscriptionClient
+          .Setup(x => x.StartTranscriptionJobAsync(It.IsAny<TranscriptionJobRequest>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+          .ReturnsAsync(
+              new TranscriptionJobResponse
+              {
+                JobId = "j-sim",
+                Status = "completed",
+                Mode = "simulation",
+                IsSimulated = true,
+                RealTranscriptionPerformed = false,
+                Transcript = tr,
+              });
+      _mockTranscriptionClient
+          .Setup(x => x.ListTranscriptionsAsync("aud-sim", It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+          .ReturnsAsync(new List<TranscriptionResponse> { tr });
+
+      var vm = CreateSut();
+      await vm.InitializeAsync(CancellationToken.None);
+      vm.SelectedAudioId = "aud-sim";
+      await vm.StartJobCommand.ExecuteAsync(null);
+      await PumpDispatcherQueueAsync().ConfigureAwait(false);
+
+      Assert.IsNotNull(vm.SelectedTranscription);
+      Assert.IsTrue(vm.LastTranscriptionWasSimulated);
+    }
+
+    [TestMethod]
+    public async Task StartJob_Unavailable_DoesNotSetSelectedTranscription()
+    {
+      _mockTranscriptionClient
+          .Setup(x => x.StartTranscriptionJobAsync(It.IsAny<TranscriptionJobRequest>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+          .ReturnsAsync(
+              new TranscriptionJobResponse
+              {
+                JobId = "j-u",
+                Status = "unavailable",
+                Mode = "unavailable",
+                Blocker = "blocked",
+              });
+
+      var vm = CreateSut();
+      await vm.InitializeAsync(CancellationToken.None);
+      vm.SelectedAudioId = "aud-u";
+      vm.SelectedTranscription = null;
+      await vm.StartJobCommand.ExecuteAsync(null);
+      await PumpDispatcherQueueAsync().ConfigureAwait(false);
+
+      Assert.IsNull(vm.SelectedTranscription);
+    }
+
+    [TestMethod]
+    public async Task StartJob_Failed_ExposesBlocker()
+    {
+      _mockTranscriptionClient
+          .Setup(x => x.StartTranscriptionJobAsync(It.IsAny<TranscriptionJobRequest>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+          .ReturnsAsync(
+              new TranscriptionJobResponse
+              {
+                JobId = "j-f",
+                Status = "failed",
+                Mode = "real",
+                Blocker = "failure-detail",
+              });
+
+      var vm = CreateSut();
+      await vm.InitializeAsync(CancellationToken.None);
+      vm.SelectedAudioId = "aud-f";
+      await vm.StartJobCommand.ExecuteAsync(null);
+      await PumpDispatcherQueueAsync().ConfigureAwait(false);
+
+      Assert.IsFalse(string.IsNullOrEmpty(vm.ErrorMessage));
+      StringAssert.Contains(vm.ErrorMessage, "failure-detail");
+    }
+
+    [TestMethod]
+    public async Task StartJob_EmptyAudioId_BlocksBeforeClientCall()
+    {
+      var vm = CreateSut();
+      await vm.InitializeAsync(CancellationToken.None);
+      vm.SelectedAudioId = "   ";
+      await vm.StartJobCommand.ExecuteAsync(null);
+      await PumpDispatcherQueueAsync().ConfigureAwait(false);
+
+      _mockTranscriptionClient.Verify(
+          x => x.StartTranscriptionJobAsync(It.IsAny<TranscriptionJobRequest>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()),
+          Times.Never);
+      Assert.IsFalse(string.IsNullOrEmpty(vm.ErrorMessage));
+    }
+
+    [TestMethod]
+    public async Task StartJob_UnavailableIsNotSuccess_NoSuccessEventEmitted()
+    {
+      var completedCount = 0;
+      var agg = AppServices.TryGetEventAggregator();
+      Assert.IsNotNull(agg);
+      using var sub = agg.Subscribe<TranscriptionCompletedEvent>(_ => completedCount++);
+
+      _mockTranscriptionClient
+          .Setup(x => x.StartTranscriptionJobAsync(It.IsAny<TranscriptionJobRequest>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+          .ReturnsAsync(
+              new TranscriptionJobResponse
+              {
+                JobId = "j-ne",
+                Status = "unavailable",
+                Mode = "unavailable",
+                Blocker = "no",
+              });
+
+      var vm = CreateSut();
+      await vm.InitializeAsync(CancellationToken.None);
+      vm.SelectedAudioId = "aud-ne";
+      await vm.StartJobCommand.ExecuteAsync(null);
+      await PumpDispatcherQueueAsync().ConfigureAwait(false);
+
+      Assert.AreEqual(0, completedCount);
+    }
+
+    [TestMethod]
+    public async Task StartJob_PendingThenCompleted_SetsSelectedTranscription()
+    {
+      var tr = new TranscriptionResponse
+      {
+        Id = "tr-poll",
+        AudioId = "aud-poll",
+        Text = "polled",
+        Created = DateTime.UtcNow,
+        Segments = new List<TranscriptionSegment>(),
+      };
+      _mockTranscriptionClient
+          .Setup(x => x.StartTranscriptionJobAsync(It.IsAny<TranscriptionJobRequest>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+          .ReturnsAsync(
+              new TranscriptionJobResponse
+              {
+                JobId = "j-poll",
+                Status = "pending",
+                Mode = "pending",
+                Progress = 0f,
+              });
+      _mockTranscriptionClient
+          .Setup(x => x.GetTranscriptionJobStatusAsync("j-poll", It.IsAny<CancellationToken>()))
+          .ReturnsAsync(
+              new TranscriptionJobResponse
+              {
+                JobId = "j-poll",
+                Status = "completed",
+                Mode = "real",
+                TranscriptId = "tr-poll",
+                IsSimulated = false,
+                RealTranscriptionPerformed = true,
+                Progress = 1f,
+              });
+      _mockTranscriptionClient
+          .Setup(x => x.GetTranscriptionAsync("tr-poll", It.IsAny<CancellationToken>()))
+          .ReturnsAsync(tr);
+      _mockTranscriptionClient
+          .Setup(x => x.ListTranscriptionsAsync("aud-poll", It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+          .ReturnsAsync(new List<TranscriptionResponse> { tr });
+
+      var vm = CreateSut();
+      await vm.InitializeAsync(CancellationToken.None);
+      vm.SelectedAudioId = "aud-poll";
+      await vm.StartJobCommand.ExecuteAsync(null);
+      await PumpDispatcherQueueAsync().ConfigureAwait(false);
+
+      Assert.IsNotNull(vm.SelectedTranscription);
+      Assert.AreEqual("tr-poll", vm.SelectedTranscription.Id);
+    }
+
+    [TestMethod]
+    public async Task StartJob_PendingThenUnavailable_SetsErrorMessage()
+    {
+      _mockTranscriptionClient
+          .Setup(x => x.StartTranscriptionJobAsync(It.IsAny<TranscriptionJobRequest>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+          .ReturnsAsync(
+              new TranscriptionJobResponse
+              {
+                JobId = "j-pu",
+                Status = "pending",
+                Mode = "pending",
+              });
+      _mockTranscriptionClient
+          .Setup(x => x.GetTranscriptionJobStatusAsync("j-pu", It.IsAny<CancellationToken>()))
+          .ReturnsAsync(
+              new TranscriptionJobResponse
+              {
+                JobId = "j-pu",
+                Status = "unavailable",
+                Mode = "unavailable",
+                Blocker = "engine-off",
+              });
+
+      var vm = CreateSut();
+      await vm.InitializeAsync(CancellationToken.None);
+      vm.SelectedAudioId = "aud-pu";
+      await vm.StartJobCommand.ExecuteAsync(null);
+      await PumpDispatcherQueueAsync().ConfigureAwait(false);
+
+      StringAssert.Contains(vm.ErrorMessage, "engine-off");
+      Assert.IsNull(vm.SelectedTranscription);
+    }
+
+    [TestMethod]
+    public async Task StartJob_PendingThenFailed_SetsErrorMessage()
+    {
+      _mockTranscriptionClient
+          .Setup(x => x.StartTranscriptionJobAsync(It.IsAny<TranscriptionJobRequest>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+          .ReturnsAsync(
+              new TranscriptionJobResponse
+              {
+                JobId = "j-pf",
+                Status = "pending",
+                Mode = "pending",
+              });
+      _mockTranscriptionClient
+          .Setup(x => x.GetTranscriptionJobStatusAsync("j-pf", It.IsAny<CancellationToken>()))
+          .ReturnsAsync(
+              new TranscriptionJobResponse
+              {
+                JobId = "j-pf",
+                Status = "failed",
+                Mode = "real",
+                Blocker = "missing-audio",
+              });
+
+      var vm = CreateSut();
+      await vm.InitializeAsync(CancellationToken.None);
+      vm.SelectedAudioId = "aud-pf";
+      await vm.StartJobCommand.ExecuteAsync(null);
+      await PumpDispatcherQueueAsync().ConfigureAwait(false);
+
+      StringAssert.Contains(vm.ErrorMessage, "missing-audio");
+      Assert.IsNull(vm.SelectedTranscription);
+    }
+
+    [TestMethod]
+    public async Task StartJob_PendingThenSimulatedCompleted_SetsLastTranscriptionWasSimulated()
+    {
+      var tr = new TranscriptionResponse
+      {
+        Id = "tr-sim-poll",
+        AudioId = "aud-sim-poll",
+        Text = "sim",
+        Created = DateTime.UtcNow,
+        Segments = new List<TranscriptionSegment>(),
+      };
+      _mockTranscriptionClient
+          .Setup(x => x.StartTranscriptionJobAsync(It.IsAny<TranscriptionJobRequest>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+          .ReturnsAsync(
+              new TranscriptionJobResponse
+              {
+                JobId = "j-sim-poll",
+                Status = "pending",
+                Mode = "pending",
+              });
+      _mockTranscriptionClient
+          .Setup(x => x.GetTranscriptionJobStatusAsync("j-sim-poll", It.IsAny<CancellationToken>()))
+          .ReturnsAsync(
+              new TranscriptionJobResponse
+              {
+                JobId = "j-sim-poll",
+                Status = "completed",
+                Mode = "simulation",
+                TranscriptId = "tr-sim-poll",
+                IsSimulated = true,
+                RealTranscriptionPerformed = false,
+                Progress = 1f,
+              });
+      _mockTranscriptionClient
+          .Setup(x => x.GetTranscriptionAsync("tr-sim-poll", It.IsAny<CancellationToken>()))
+          .ReturnsAsync(tr);
+      _mockTranscriptionClient
+          .Setup(x => x.ListTranscriptionsAsync("aud-sim-poll", It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+          .ReturnsAsync(new List<TranscriptionResponse> { tr });
+
+      var vm = CreateSut();
+      await vm.InitializeAsync(CancellationToken.None);
+      vm.SelectedAudioId = "aud-sim-poll";
+      vm.SimulateTranscription = true;
+      await vm.StartJobCommand.ExecuteAsync(null);
+      await PumpDispatcherQueueAsync().ConfigureAwait(false);
+
+      Assert.IsTrue(vm.LastTranscriptionWasSimulated);
+      Assert.IsNotNull(vm.SelectedTranscription);
+    }
+
+    [TestMethod]
+    public async Task StartJob_BackendThrows_SurfacesErrorMessage()
+    {
+      _mockTranscriptionClient
+          .Setup(x => x.StartTranscriptionJobAsync(It.IsAny<TranscriptionJobRequest>(), It.IsAny<string?>(), It.IsAny<CancellationToken>()))
+          .ThrowsAsync(new InvalidOperationException("bad-audio"));
+
+      var vm = CreateSut();
+      await vm.InitializeAsync(CancellationToken.None);
+      vm.SelectedAudioId = "aud-x";
+      await vm.StartJobCommand.ExecuteAsync(null);
+      await PumpDispatcherQueueAsync().ConfigureAwait(false);
+
+      Assert.IsFalse(string.IsNullOrEmpty(vm.ErrorMessage));
+      StringAssert.Contains(vm.ErrorMessage, "bad-audio");
+    }
+
+    [TestMethod]
+    public void CreateTimelineClips_CommandCannotExecute_WhenNoDialogueService()
+    {
+      var vm = CreateSutWithoutDialogueClient();
+      Assert.IsFalse(vm.CreateTimelineClipsCommand.CanExecute(null));
+    }
+
+    [TestMethod]
+    public void CreateTimelineClips_CommandCannotExecute_WhenNoSelectedTranscription()
+    {
+      var vm = CreateSut();
+      vm.SelectedTranscription = null;
+      Assert.IsFalse(vm.CreateTimelineClipsCommand.CanExecute(null));
+    }
+
+    [TestMethod]
+    public async Task CreateTimelineClips_EmptyTrackId_SendsAutoCreateRequest()
+    {
+      CreateTimelineClipsFromTranscriptRequest? capturedReq = null;
+      _mockDialogueClient
+          .Setup(x => x.CreateTimelineClipsAsync("tid1", It.IsAny<CreateTimelineClipsFromTranscriptRequest>(), It.IsAny<CancellationToken>()))
+          .Callback<string, CreateTimelineClipsFromTranscriptRequest, CancellationToken>((_, req, _) => capturedReq = req)
+          .ReturnsAsync(
+              new CreateTimelineClipsFromTranscriptResponse
+              {
+                TranscriptId = "tid1",
+                SessionId = "s",
+                TrackId = "auto-trk",
+                CreatedClipIds = new List<string> { "c1" },
+                SegmentCount = 1,
+                Status = "ok",
+              });
+
+      var vm = CreateSut();
+      await vm.InitializeAsync(CancellationToken.None);
+      vm.SelectedTranscription = new TranscriptionResponse
+      {
+        Id = "tid1",
+        Text = "x",
+        Segments = new List<TranscriptionSegment>(),
+      };
+      vm.CreateTimelineClipsTrackId = "   ";
+      await vm.CreateTimelineClipsCommand.ExecuteAsync(null);
+      await PumpDispatcherQueueAsync().ConfigureAwait(false);
+
+      Assert.IsNotNull(capturedReq);
+      Assert.IsNull(capturedReq.TrackId);
+      Assert.IsTrue(capturedReq.AutoCreateTrack);
+      _mockDialogueClient.Verify(
+          x => x.CreateTimelineClipsAsync("tid1", It.IsAny<CreateTimelineClipsFromTranscriptRequest>(), It.IsAny<CancellationToken>()),
+          Times.Once);
+    }
+
+    [TestMethod]
+    public async Task CreateTimelineClips_NoTrackId_StoresResolvedTrackIdFromResponse()
+    {
+      _mockDialogueClient
+          .Setup(x => x.CreateTimelineClipsAsync(It.IsAny<string>(), It.IsAny<CreateTimelineClipsFromTranscriptRequest>(), It.IsAny<CancellationToken>()))
+          .ReturnsAsync(
+              new CreateTimelineClipsFromTranscriptResponse
+              {
+                TranscriptId = "tid-r",
+                SessionId = "s",
+                TrackId = "resolved-x",
+                CreatedClipIds = new List<string> { "c1" },
+                SegmentCount = 1,
+                Status = "ok",
+              });
+
+      var vm = CreateSut();
+      await vm.InitializeAsync(CancellationToken.None);
+      vm.CreateTimelineClipsTrackId = string.Empty;
+      vm.SelectedTranscription = new TranscriptionResponse
+      {
+        Id = "tid-r",
+        Text = "x",
+        Segments = new List<TranscriptionSegment>(),
+      };
+      await vm.CreateTimelineClipsCommand.ExecuteAsync(null);
+      await PumpDispatcherQueueAsync().ConfigureAwait(false);
+
+      Assert.AreEqual("resolved-x", vm.CreateTimelineClipsTrackId);
+    }
+
+    [TestMethod]
+    public async Task CreateTimelineClips_SendsTranscriptId_AndTrackId()
+    {
+      CreateTimelineClipsFromTranscriptRequest? capturedReq = null;
+      _mockDialogueClient
+          .Setup(x => x.CreateTimelineClipsAsync("tid-z", It.IsAny<CreateTimelineClipsFromTranscriptRequest>(), It.IsAny<CancellationToken>()))
+          .Callback<string, CreateTimelineClipsFromTranscriptRequest, CancellationToken>((_, req, _) => capturedReq = req)
+          .ReturnsAsync(
+              new CreateTimelineClipsFromTranscriptResponse
+              {
+                TranscriptId = "tid-z",
+                SessionId = "s1",
+                TrackId = "trk-9",
+                CreatedClipIds = new List<string> { "c1" },
+                SegmentCount = 1,
+                Status = "ok",
+              });
+
+      var vm = CreateSut();
+      await vm.InitializeAsync(CancellationToken.None);
+      vm.SelectedTranscription = new TranscriptionResponse
+      {
+        Id = "tid-z",
+        Text = "x",
+        Segments = new List<TranscriptionSegment>(),
+      };
+      vm.CreateTimelineClipsTrackId = "trk-9";
+      await vm.CreateTimelineClipsCommand.ExecuteAsync(null);
+      await PumpDispatcherQueueAsync().ConfigureAwait(false);
+
+      Assert.IsNotNull(capturedReq);
+      Assert.AreEqual("trk-9", capturedReq.TrackId);
+      _mockDialogueClient.Verify(
+          x => x.CreateTimelineClipsAsync("tid-z", It.IsAny<CreateTimelineClipsFromTranscriptRequest>(), It.IsAny<CancellationToken>()),
+          Times.Once);
+    }
+
+    [TestMethod]
+    public async Task CreateTimelineClips_BackendError_SurfacesErrorMessage()
+    {
+      _mockDialogueClient
+          .Setup(x => x.CreateTimelineClipsAsync(It.IsAny<string>(), It.IsAny<CreateTimelineClipsFromTranscriptRequest>(), It.IsAny<CancellationToken>()))
+          .ThrowsAsync(new InvalidOperationException("track-not-found"));
+
+      var vm = CreateSut();
+      await vm.InitializeAsync(CancellationToken.None);
+      vm.SelectedTranscription = new TranscriptionResponse
+      {
+        Id = "tid-e",
+        Text = "x",
+        Segments = new List<TranscriptionSegment>(),
+      };
+      vm.CreateTimelineClipsTrackId = "trk-bad";
+      await vm.CreateTimelineClipsCommand.ExecuteAsync(null);
+      await PumpDispatcherQueueAsync().ConfigureAwait(false);
+
+      Assert.IsFalse(string.IsNullOrEmpty(vm.ErrorMessage));
+      StringAssert.Contains(vm.ErrorMessage, "track-not-found");
+    }
+
+    [TestMethod]
+    public async Task CreateTimelineClips_Success_StoresCreatedClipIds()
+    {
+      _mockDialogueClient
+          .Setup(x => x.CreateTimelineClipsAsync(It.IsAny<string>(), It.IsAny<CreateTimelineClipsFromTranscriptRequest>(), It.IsAny<CancellationToken>()))
+          .ReturnsAsync(
+              new CreateTimelineClipsFromTranscriptResponse
+              {
+                TranscriptId = "tid-ok",
+                SessionId = "sess",
+                TrackId = "trk-ok",
+                CreatedClipIds = new List<string> { "clip-a", "clip-b" },
+                SegmentCount = 2,
+                Status = "created",
+              });
+
+      var vm = CreateSut();
+      await vm.InitializeAsync(CancellationToken.None);
+      vm.SelectedTranscription = new TranscriptionResponse
+      {
+        Id = "tid-ok",
+        Text = "x",
+        Segments = new List<TranscriptionSegment>(),
+      };
+      vm.CreateTimelineClipsTrackId = "trk-ok";
+      await vm.CreateTimelineClipsCommand.ExecuteAsync(null);
+      await PumpDispatcherQueueAsync().ConfigureAwait(false);
+
+      CollectionAssert.AreEqual(new[] { "clip-a", "clip-b" }, vm.LastCreatedTimelineClipIds.ToArray());
+    }
+
+    [TestMethod]
+    public void ExportTimeline_CommandCannotExecute_WhenNoTimelineUseCase()
+    {
+      var vm = CreateSutWithoutTimelineUseCase();
+      Assert.IsFalse(vm.ExportTimelineCommand.CanExecute(null));
+    }
+
+    [TestMethod]
+    public void ExportTimeline_CommandCannotExecute_WhenNoClips()
+    {
+      var vm = CreateSut();
+      Assert.IsFalse(vm.ExportTimelineCommand.CanExecute(null));
+    }
+
+    [TestMethod]
+    public async Task ExportTimeline_WithClips_CallsExportAsync()
+    {
+      _mockDialogueClient
+          .Setup(x => x.CreateTimelineClipsAsync(It.IsAny<string>(), It.IsAny<CreateTimelineClipsFromTranscriptRequest>(), It.IsAny<CancellationToken>()))
+          .ReturnsAsync(
+              new CreateTimelineClipsFromTranscriptResponse
+              {
+                TranscriptId = "tid-ex",
+                SessionId = "s",
+                TrackId = "trk-ex",
+                CreatedClipIds = new List<string> { "clip-x" },
+                SegmentCount = 1,
+                Status = "ok",
+              });
+      _mockTimelineUseCase
+          .Setup(x => x.ExportAsync(It.IsAny<string>(), It.IsAny<ExportOptions>(), It.IsAny<CancellationToken>()))
+          .ReturnsAsync(@"C:\fake\out.wav");
+
+      var vm = CreateSut();
+      await vm.InitializeAsync(CancellationToken.None);
+      vm.SelectedTranscription = new TranscriptionResponse
+      {
+        Id = "tid-ex",
+        Text = "x",
+        Segments = new List<TranscriptionSegment>(),
+      };
+      await vm.CreateTimelineClipsCommand.ExecuteAsync(null);
+      await PumpDispatcherQueueAsync().ConfigureAwait(false);
+
+      Assert.IsTrue(vm.ExportTimelineCommand.CanExecute(null));
+      await vm.ExportTimelineCommand.ExecuteAsync(null);
+      await PumpDispatcherQueueAsync().ConfigureAwait(false);
+
+      _mockTimelineUseCase.Verify(
+          x => x.ExportAsync(It.IsAny<string>(), It.IsAny<ExportOptions>(), It.IsAny<CancellationToken>()),
+          Times.Once);
+    }
+
+    [TestMethod]
+    public async Task ExportTimeline_Success_StoresLastExportPath()
+    {
+      const string expectedPath = @"E:\exports\unit_test.wav";
+      _mockDialogueClient
+          .Setup(x => x.CreateTimelineClipsAsync(It.IsAny<string>(), It.IsAny<CreateTimelineClipsFromTranscriptRequest>(), It.IsAny<CancellationToken>()))
+          .ReturnsAsync(
+              new CreateTimelineClipsFromTranscriptResponse
+              {
+                TranscriptId = "tid-p",
+                SessionId = "s",
+                TrackId = "trk-p",
+                CreatedClipIds = new List<string> { "c1" },
+                SegmentCount = 1,
+                Status = "ok",
+              });
+      _mockTimelineUseCase
+          .Setup(x => x.ExportAsync(It.IsAny<string>(), It.IsAny<ExportOptions>(), It.IsAny<CancellationToken>()))
+          .ReturnsAsync(expectedPath);
+
+      var vm = CreateSut();
+      await vm.InitializeAsync(CancellationToken.None);
+      vm.SelectedTranscription = new TranscriptionResponse
+      {
+        Id = "tid-p",
+        Text = "x",
+        Segments = new List<TranscriptionSegment>(),
+      };
+      await vm.CreateTimelineClipsCommand.ExecuteAsync(null);
+      await PumpDispatcherQueueAsync().ConfigureAwait(false);
+      await vm.ExportTimelineCommand.ExecuteAsync(null);
+      await PumpDispatcherQueueAsync().ConfigureAwait(false);
+
+      Assert.AreEqual(expectedPath, vm.LastExportPath);
+    }
+
+    [TestMethod]
+    public async Task ExportTimeline_Failure_SurfacesErrorMessage()
+    {
+      _mockDialogueClient
+          .Setup(x => x.CreateTimelineClipsAsync(It.IsAny<string>(), It.IsAny<CreateTimelineClipsFromTranscriptRequest>(), It.IsAny<CancellationToken>()))
+          .ReturnsAsync(
+              new CreateTimelineClipsFromTranscriptResponse
+              {
+                TranscriptId = "tid-f",
+                SessionId = "s",
+                TrackId = "trk-f",
+                CreatedClipIds = new List<string> { "c1" },
+                SegmentCount = 1,
+                Status = "ok",
+              });
+      _mockTimelineUseCase
+          .Setup(x => x.ExportAsync(It.IsAny<string>(), It.IsAny<ExportOptions>(), It.IsAny<CancellationToken>()))
+          .ThrowsAsync(new InvalidOperationException("export-blocked"));
+
+      var vm = CreateSut();
+      await vm.InitializeAsync(CancellationToken.None);
+      vm.SelectedTranscription = new TranscriptionResponse
+      {
+        Id = "tid-f",
+        Text = "x",
+        Segments = new List<TranscriptionSegment>(),
+      };
+      await vm.CreateTimelineClipsCommand.ExecuteAsync(null);
+      await PumpDispatcherQueueAsync().ConfigureAwait(false);
+      await vm.ExportTimelineCommand.ExecuteAsync(null);
+      await PumpDispatcherQueueAsync().ConfigureAwait(false);
+
+      Assert.IsFalse(string.IsNullOrEmpty(vm.ErrorMessage));
+      StringAssert.Contains(vm.ErrorMessage, "export-blocked");
     }
   }
 }

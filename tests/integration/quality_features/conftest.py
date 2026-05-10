@@ -18,8 +18,15 @@ from backend.api.main import app
 
 @pytest.fixture
 def client():
-    """Create a test client for the FastAPI app."""
-    return TestClient(app)
+    """Create a test client for the FastAPI app.
+
+    ``with TestClient(app)`` so FastAPI lifespan ``shutdown`` actually runs
+    (engine stop, scheduler stop, db close); without it the heavy-startup task
+    is never created and shutdown is skipped, which has been observed to leave
+    non-daemon worker threads alive on CI and block process exit (PR #49).
+    """
+    with TestClient(app) as c:
+        yield c
 
 
 @pytest.fixture

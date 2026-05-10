@@ -48,5 +48,11 @@
     "start_backend.ps1": "Default VenvDir changed from venv to .venv",
     "BackendStartFailedEventArgs.cs": "Added BaselineDepsFailure category",
     "StartupRetryCoordinator.cs": "BaselineDepsFailure no-retry explanation"
-  }
+  },
+  "command": "Slice 5 operator verification: pytest baseline/health/library + dotnet DebugBuild_InterpreterPriority_DotVenvBeforeVenv + ProfilesViewModelSeamTests + dotnet build VoiceStudio.sln (see proof_type)",
+  "exit_code": 0,
+  "timestamp": "2026-04-16T22:51:16.717920Z",
+  "git_commit": "0000000000000000000000000000000000000000",
+  "git_branch": "historical_verification_artifact",
+  "evidence_fingerprint": "89df95a95df13c741a747d2b1f9c031d69bfcb932a7141dece9661d08382bbb0"
 }

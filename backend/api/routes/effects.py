@@ -485,6 +485,15 @@ def process_audio_with_chain(
                 ),
             )
 
+        # GAP-039 / strict legacy contract: reject empty enabled chains before loading
+        # audio, so missing optional DSP I/O deps cannot mask HTTP 400 with 503.
+        enabled_effects = [e for e in chain.effects if e.enabled]
+        if not enabled_effects:
+            raise HTTPException(
+                status_code=400,
+                detail="Effect chain has no enabled effects",
+            )
+
         # Load audio file
         from backend.services.audio_artifacts import AudioRegistry
 

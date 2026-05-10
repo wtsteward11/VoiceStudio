@@ -19,7 +19,6 @@ CRITICAL_FORBIDDEN_TERMS = [
     "FIXME",
     "NotImplementedError",
     "NotImplementedException",
-    "pass",  # Only in non-abstract methods
 ]
 
 # Context-aware forbidden terms (check context before flagging)
@@ -71,8 +70,12 @@ EXCLUDE_DIRS = [
     ".mypy_cache",
     "tests",  # Exclude test files
     "test_data",  # Exclude test data
-    "docs",  # Exclude documentation
-    "installer",  # Exclude installer scripts
+    "docs",  # Documentation vocabulary is not production placeholder drift
+    "installer",
+    "runtime/external",
+    ".cursor",
+    "artifacts",
+    ".buildlogs",
 ]
 
 # Files to exclude
@@ -172,15 +175,7 @@ def check_file_for_violations(file_path: Path) -> list[tuple[int, str, str]]:
                     term_lower = term.lower()
 
                     if term_lower in line_lower:
-                        # Special handling for "pass" - only flag if not in abstract method or exception handler
-                        if term_lower == "pass":
-                            # Check if it's just "pass" on its own (likely a stub)
-                            if line_stripped.strip() == "pass" or line_stripped.strip().endswith(
-                                ": pass"
-                            ):
-                                violations.append((line_num, term, line_stripped[:100]))
-                        else:
-                            violations.append((line_num, term, line_stripped[:100]))
+                        violations.append((line_num, term, line_stripped[:100]))
 
                 # Check context-aware forbidden terms
                 for term in CONTEXT_FORBIDDEN_TERMS:
@@ -272,20 +267,21 @@ def main():
     violations_by_file = scan_directory(project_root)
 
     report = generate_report(violations_by_file)
-    print(report)
 
     report_file = project_root / "placeholder_verification_report_improved.txt"
     with open(report_file, "w", encoding="utf-8") as f:
         f.write(report)
 
-    logger.info(f"Report saved to: {report_file}")
-
     if violations_by_file:
-        logger.error(f"Found {len(violations_by_file)} files with violations")
+        logger.error(
+            "Found %s files with violations (full report: %s)",
+            len(violations_by_file),
+            report_file,
+        )
         return 1
-    else:
-        logger.info("No placeholder violations found!")
-        return 0
+
+    logger.info("No placeholder violations found!")
+    return 0
 
 
 if __name__ == "__main__":

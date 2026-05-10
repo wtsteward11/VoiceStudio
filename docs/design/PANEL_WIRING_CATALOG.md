@@ -48,7 +48,7 @@ Module panels: VoiceCloningWizard, MultiVoiceGenerator, RealTimeConverter, Emoti
 | Category | Details |
 |----------|---------|
 | **Publishes** | `PlaybackStateChangedEvent`, `TimelineSelectionChangedEvent`, `PlaybackRequestedEvent`, `ClipTranscriptSelectionEvent` (GAP-033) |
-| **Subscribes** | `NavigateToEvent`, `AddToTimelineEvent`, `TranscriptionCompletedEvent`, `SynthesisCompletedEvent` (GAP-W2) |
+| **Subscribes** | `NavigateToEvent`, `AddToTimelineEvent`, `TranscriptionCompletedEvent`, `SynthesisCompletedEvent` (GAP-W2), `GeneratedAudioClipInsertedEvent` |
 | **Backend** | `/api/timeline/*`, `/api/projects/*`, `/api/audio/*` |
 | **Shared Services** | IBackendClient, IAudioPlayerService, MultiSelectService, ToastNotificationService, UndoRedoService, ISettingsService, RecentProjectsService, IEventAggregator |
 | **Throttle** | PlaybackStateChangedEvent — **SHOULD THROTTLE** (high-frequency) |
@@ -233,6 +233,7 @@ Events that MAY be used in `Publish<T>` and `Subscribe<T>`:
 - `TimelineSelectionChangedEvent`
 - `EngineChangedEvent`
 - `EngineSettingsChangedEvent`
+- `GeneratedAudioClipInsertedEvent`
 - `CloneReferenceSelectedEvent`
 - `VoiceProfileSelectedEvent`
 - `PlaybackRequestedEvent`

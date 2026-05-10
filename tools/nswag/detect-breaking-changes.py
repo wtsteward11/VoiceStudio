@@ -268,7 +268,7 @@ def print_report(report: ChangeReport, json_output: bool = False) -> None:
     if report.breaking_changes:
         print(f"[BREAKING CHANGES] ({len(report.breaking_changes)})")
         for change in report.breaking_changes:
-            print(f"  ❌ {change.message}")
+            print(f"  [BREAK] {change.message}")
             print(f"     Path: {change.path}")
             if change.details:
                 print(f"     Note: {change.details}")
@@ -277,14 +277,14 @@ def print_report(report: ChangeReport, json_output: bool = False) -> None:
     if report.warnings:
         print(f"[WARNINGS] ({len(report.warnings)})")
         for change in report.warnings:
-            print(f"  ⚠️  {change.message}")
+            print(f"  [WARN] {change.message}")
             print(f"     Path: {change.path}")
         print()
 
     if report.info:
         print(f"[INFO] ({len(report.info)})")
         for change in report.info[:5]:
-            print(f"  ℹ️  {change.message}")
+            print(f"  [INFO] {change.message}")
         if len(report.info) > 5:
             print(f"  ... and {len(report.info) - 5} more")
         print()

@@ -58,6 +58,8 @@ async def test_synthesize_stub_returns_audio(client: AsyncClient) -> None:
             "engine": "piper",
             "text": "Synthesis stub test sentence.",
             "language": "en",
+            "project_id": "proof-project",
+            "session_id": "proof-session",
         },
     )
     assert synth_resp.status_code in (200, 201, 202), (
@@ -67,6 +69,9 @@ async def test_synthesize_stub_returns_audio(client: AsyncClient) -> None:
     audio_id = synth_data.get("audio_id")
     assert audio_id, f"No audio_id in synthesis response: {synth_data}"
     assert "audio_url" in synth_data
+    assert synth_data["generated_audio_id"] == audio_id
+    assert synth_data["profile_id"] == profile_id
+    assert synth_data["routed_engine"] == "stub"
     assert synth_data.get("duration", 0) >= 0
 
     audio_resp = await client.get(f"/api/audio/file/{audio_id}")

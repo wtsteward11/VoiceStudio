@@ -1,0 +1,40 @@
+{
+  "paths": [
+    "backend/api/main.py",
+    "backend/supervisor/",
+    "backend/lifecycle/",
+    "backend/plugins/sandbox/",
+    "backend/services/plugin_sandbox.py",
+    "backend/ipc/",
+    "backend/telemetry/",
+    "backend/security/",
+    "backend/platform/monitoring/",
+    "backend/platform/config/data_retention.py",
+    "backend/platform/config/backup_service.py",
+    "backend/core/memory/",
+    "backend/core/gpu/",
+    "backend/api/ws/",
+    "backend/api/optimization.py",
+    "app/core/infrastructure/",
+    "app/core/engines/rvc_realtime.py",
+    "app/core/engines/streaming_engine.py",
+    "app/core/tasks/scheduler.py",
+    "app/core/runtime/resource_manager_enhanced.py",
+    "app/core/runtime/engine_lifecycle.py",
+    "app/core/runtime/engine_lifecycle_optimized.py",
+    "app/core/runtime/runtime_engine.py",
+    "app/core/runtime/runtime_engine_enhanced.py",
+    "app/core/utils/temp_file_manager.py"
+  ],
+  "line_regex": [
+    "# durable-job-backed",
+    "canonical_job_lifecycle",
+    "create_job\\(",
+    "mark_job_running\\("
+  ],
+  "_meta": {
+    "purpose": "Allow infrastructure lifecycle tasks (startup, shutdown, heartbeat, scheduler loops) and engine/runtime subprocess management. Product-facing background work (synthesis, training, cloning, batch) must use canonical job lifecycle.",
+    "review_date": "2026-04-29",
+    "owner": "Runtime Truth v1"
+  }
+}

@@ -488,7 +488,7 @@ class DiagnosticsService:
         start = time.perf_counter()
 
         try:
-            from backend.ml.models.model_drift_detector import get_model_drift_detector
+            from backend.services.model_drift_detector import get_model_drift_detector
 
             detector = get_model_drift_detector()
             statuses = detector.get_status()

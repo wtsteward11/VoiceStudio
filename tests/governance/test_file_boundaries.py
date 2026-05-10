@@ -42,7 +42,8 @@ class TestFileBoundaries:
         )
 
         assert result.denied
-        assert "denied" in result.policy_result.reason.lower()
+        violations_text = " ".join(result.policy_result.violations or []).lower()
+        assert "denied" in violations_text
 
     def test_read_denied_secrets_directory(self, tool_gateway, agent_identity, temp_dir):
         """Test that secrets directory is denied."""

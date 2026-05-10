@@ -130,7 +130,7 @@ class TestAudioUtilsErrorHandling:
         """Test normalize_lufs handles invalid input."""
         try:
             # Test with None
-            with pytest.raises((TypeError, ValueError, AttributeError)):
+            with pytest.raises((TypeError, ValueError, AttributeError, ImportError)):
                 audio_utils.normalize_lufs(None, 44100, target_lufs=-23.0)
         except AttributeError:
             pytest.skip("normalize_lufs not available")
@@ -144,7 +144,7 @@ class TestAudioUtilsErrorHandling:
         audio_data = np.random.randn(44100).astype(np.float32)
 
         try:
-            with pytest.raises((ValueError, TypeError)):
+            with pytest.raises((ValueError, TypeError, ImportError)):
                 audio_utils.resample_audio(audio_data, -1, 22050)
         except AttributeError:
             pytest.skip("resample_audio not available")

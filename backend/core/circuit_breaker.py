@@ -158,8 +158,13 @@ class CircuitBreaker:
         self._total_failures = 0
         self._total_blocked = 0
 
-        # Thread safety
-        self._lock = asyncio.Lock()
+        # Created lazily on first async entry so module import works without a running event loop (Py3.9).
+        self._lock: asyncio.Lock | None = None
+
+    def _get_async_lock(self) -> asyncio.Lock:
+        if self._lock is None:
+            self._lock = asyncio.Lock()
+        return self._lock
 
     @property
     def state(self) -> CircuitState:
@@ -341,7 +346,7 @@ class CircuitBreaker:
             async with breaker():
                 result = await risky_operation()
         """
-        async with self._lock:
+        async with self._get_async_lock():
             if not self.allow_request():
                 raise CircuitBreakerOpenError(self.name, self.time_until_retry())
             # Note: allow_request() now increments _half_open_calls when in HALF_OPEN state
@@ -382,7 +387,6 @@ class CircuitBreakerRegistry:
         self._breakers: dict[str, CircuitBreaker] = {}
         self._default_failure_threshold = default_failure_threshold
         self._default_recovery_timeout = default_recovery_timeout
-        self._lock = asyncio.Lock()
 
     def get(self, name: str) -> CircuitBreaker:
         """Get or create a circuit breaker for the given name."""

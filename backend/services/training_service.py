@@ -496,17 +496,35 @@ async def run_training(
     learning_rate: float = 0.0001,
     gpu: bool = True,
 ) -> None:
-    """Start real or simulated training. Called as background task."""
+    """Start real or simulated training. Called as background task.
+
+    Policy (no-fallbacks): real training requested → attempt real training only.
+    If the training backend (Coqui TTS) is not installed, the job FAILS with an actionable
+    error rather than silently switching to simulation. Callers who explicitly want simulation
+    must use a separate ``simulation_mode=True`` entry point (not implemented here yet).
+    """
     try:
         import backend.training.facade
-        await _execute_real_training(training_id, dataset_id, profile_id, engine, epochs, batch_size, learning_rate, gpu)
+
+        await _execute_real_training(
+            training_id, dataset_id, profile_id, engine, epochs, batch_size, learning_rate, gpu
+        )
     except ImportError as e:
-        logger.warning(
-            "XTTSTrainer not available (%s), falling back to simulation. "
-            "For real training, install Coqui TTS: pip install coqui-tts==0.27.2",
+        logger.error(
+            "Real training unavailable — Coqui TTS not installed (%s). "
+            "Install: pip install coqui-tts==0.27.2",
             e,
         )
-        await _simulate_training(training_id, epochs, batch_size, learning_rate)
+        key = f"training_{training_id}"
+        if key in _training_jobs_store:
+            sd = _training_jobs_store[key]
+            sd["status"] = "failed"
+            sd["error"] = (
+                f"Real training backend unavailable: {e}. "
+                "Install Coqui TTS (pip install coqui-tts==0.27.2) and retry."
+            )
+            sd["completed"] = datetime.utcnow().isoformat()
+            sd["progress"] = 0.0
 
 
 async def _execute_real_training(
@@ -633,14 +651,19 @@ async def _execute_real_training(
                     "status": "running",
                 },
             ))
-        # ALLOWED: bare except - best effort, failure acceptable
-        except Exception:
-            pass
+        except Exception as exc:
+            logger.debug("Broadcast training progress failed (non-fatal): %s", exc)
 
     import concurrent.futures
 
     loop = asyncio.get_event_loop()
-    executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+    # Use the executor as a context manager so its non-daemon worker thread is
+    # joined when the training job finishes (success or failure). Without this,
+    # the worker can survive interpreter shutdown and contribute to the PR #49
+    # post-pytest hang on CI Linux runners.
+    executor = concurrent.futures.ThreadPoolExecutor(
+        max_workers=1, thread_name_prefix="training-job"
+    )
 
     def run_training_sync():
         return trainer.train(
@@ -653,7 +676,10 @@ async def _execute_real_training(
         )
 
     try:
-        training_result = await loop.run_in_executor(executor, run_training_sync)
+        try:
+            training_result = await loop.run_in_executor(executor, run_training_sync)
+        finally:
+            executor.shutdown(wait=False)
         if key in _training_jobs_store:
             sd = _training_jobs_store[key]
             sd["status"] = "completed"
@@ -778,9 +804,8 @@ async def _simulate_training(
                         "validation_loss": validation_loss,
                     },
                 )
-            # ALLOWED: bare except - best effort, failure acceptable
-            except Exception:
-                pass
+            except Exception as exc:
+                logger.debug("Broadcast simulation progress failed (non-fatal): %s", exc)
 
         if key in _training_jobs_store:
             status_dict["status"] = SIMULATION_STATUS

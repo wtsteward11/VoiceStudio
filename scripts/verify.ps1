@@ -402,10 +402,10 @@ if ($SkipSmoke) {
     $proofLines += "SkipSmoke: Backend Smoke Auto-Probe skipped (GAP-069 slice 4)"
 }
 if ($ResumeFrom) {
-    $proofLines += "ResumeFrom: $ResumeFrom (GAP-069 slice 9 — inherited stages from latest/checkpoint.json)"
+    $proofLines += "ResumeFrom: $ResumeFrom (GAP-069 slice 9 - inherited stages from latest/checkpoint.json)"
 }
 if ($StopAfterStage) {
-    $proofLines += "StopAfterStage: $StopAfterStage (GAP-069 slice 9 — exit after this stage completes)"
+    $proofLines += "StopAfterStage: $StopAfterStage (GAP-069 slice 9 - exit after this stage completes)"
 }
 $proofLines += "StageTimeouts:"
 foreach ($key in $StageTimeouts.Keys) {

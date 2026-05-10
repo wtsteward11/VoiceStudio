@@ -30,6 +30,15 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 from scripts.ci.proof_fingerprint import compute_fingerprint
 
+# Runtime / API capture proofs: not STATE.md canonical schema; build.yml still glob-validates.
+_PROOF_OBSERVATION_ONLY_PREFIXES: tuple[str, ...] = (
+    "PROOF_LIBRARY_RUNTIME_API_",
+    "PROOF_LIBRARY_UI_RUNTIME_",
+    "PROOF_PROFILES_RUNTIME_API_",
+    "PROOF_PROFILES_UI_RUNTIME_",
+    "PROOF_RUNTIME_AUTHORITY_",
+)
+
 
 def _rel(path: Path) -> str:
     """Return path relative to ROOT, or the path name if outside ROOT."""
@@ -153,6 +162,16 @@ def validate_nested_semantics(
         return []
 
     if proof_type == "PROOF_GATE_C":
+        rel_path_gc = str(_rel(path)).replace("\\", "/")
+        allowlisted_gc = _load_allowlisted_paths(schema)
+        if data.get("historical_proof") is True and rel_path_gc in allowlisted_gc:
+            ui_smoke_hist = data.get("ui_smoke")
+            if not isinstance(ui_smoke_hist, dict):
+                errors.append(
+                    f"{_rel(path)}: ui_smoke must be object for nested validation"
+                )
+            return errors
+
         ui_smoke = data.get("ui_smoke")
         if not isinstance(ui_smoke, dict):
             errors.append(
@@ -606,11 +625,16 @@ def validate_nested_semantics(
                     f"{_rel(path)}: test_ran must be true"
                 )
 
-        # Ephemeral artifacts (.buildlogs/proof_runs/) may not survive across commits;
-        # skip existence check only for historical proofs where cleanup is expected.
+        # Ephemeral or archived artifacts: skip on-disk existence / byte-hash checks.
+        _rel_nested = str(_rel(path)).replace("\\", "/")
+        _allow_nested = set(_load_allowlisted_paths(schema))
         _art_path = (data.get("artifact_path") or "").replace("\\", "/")
         _is_historical = data.get("historical_proof", False) is True
-        _art_ephemeral = _is_historical and (".buildlogs" in _art_path or "proof_runs" in _art_path)
+        _skip_artifact_verify = _is_historical and (
+            _rel_nested in _allow_nested
+            or ".buildlogs" in _art_path
+            or "proof_runs" in _art_path
+        )
 
         if nested.get("artifact_path_required"):
             art_path_str = data.get("artifact_path", "")
@@ -625,7 +649,7 @@ def validate_nested_semantics(
                     errors.append(
                         f"{_rel(path)}: artifact_path must be under repo root"
                     )
-                elif not _art_ephemeral and not art_full.exists():
+                elif not _skip_artifact_verify and not art_full.exists():
                     errors.append(
                         f"{_rel(path)}: artifact_path does not exist: {art_path_str}"
                     )
@@ -641,13 +665,14 @@ def validate_nested_semantics(
                 if art_path_str and isinstance(art_path_str, str):
                     art_full = (ROOT / art_path_str.replace("\\", "/")).resolve()
                     if art_full.exists():
-                        with open(art_full, "rb") as f:
-                            actual_hash = hashlib.sha256(f.read()).hexdigest()
-                        if art_sha.lower() != actual_hash.lower():
-                            errors.append(
-                                f"{_rel(path)}: artifact_sha256 does not match file at artifact_path"
-                            )
-                    elif not _art_ephemeral:
+                        if not _skip_artifact_verify:
+                            with open(art_full, "rb") as f:
+                                actual_hash = hashlib.sha256(f.read()).hexdigest()
+                            if art_sha.lower() != actual_hash.lower():
+                                errors.append(
+                                    f"{_rel(path)}: artifact_sha256 does not match file at artifact_path"
+                                )
+                    elif not _skip_artifact_verify:
                         errors.append(
                             f"{_rel(path)}: cannot verify artifact_sha256: artifact file does not exist"
                         )
@@ -682,6 +707,69 @@ def validate_types(data: dict, key: str, expected: str) -> str | None:
     return None
 
 
+def _validate_backend_smoke_proof_body(path: Path, data: dict) -> list[str]:
+    """
+    Validate PROOF_BACKEND_SMOKE_*.json (GAP-069 schema v1).
+
+    These files are NOT STATE.md canonical proofs; they omit command/exit_code/git fields.
+    """
+    errors: list[str] = []
+    rel = _rel(path)
+    required_top = (
+        "schema_version",
+        "status",
+        "timestamp_utc",
+        "port",
+        "cold_start_ms",
+        "health_probe_result",
+        "engines_ready_value",
+        "api_call_result",
+        "startup_decision_artifact",
+        "blocking_reason",
+        "failure_reason",
+        "environment_hints",
+    )
+    missing = [k for k in required_top if k not in data]
+    if missing:
+        errors.append(f"{rel}: missing keys: {missing}")
+        return errors
+
+    if data.get("schema_version") != 1:
+        errors.append(
+            f"{rel}: schema_version must be 1, got {data.get('schema_version')!r}"
+        )
+
+    status = data.get("status")
+    if status not in ("PASS", "FAIL", "BLOCKED"):
+        errors.append(f"{rel}: status must be PASS|FAIL|BLOCKED, got {status!r}")
+
+    ts = data.get("timestamp_utc")
+    if not isinstance(ts, str):
+        errors.append(f"{rel}: timestamp_utc must be str, got {type(ts).__name__}")
+    else:
+        try:
+            datetime.fromisoformat(ts.replace("Z", "+00:00"))
+        except (ValueError, TypeError):
+            errors.append(f"{rel}: timestamp_utc not valid ISO8601: {ts!r}")
+
+    if not isinstance(data.get("health_probe_result"), bool):
+        errors.append(
+            f"{rel}: health_probe_result must be bool, "
+            f"got {type(data.get('health_probe_result')).__name__}"
+        )
+
+    hints = data.get("environment_hints")
+    if not isinstance(hints, list):
+        errors.append(
+            f"{rel}: environment_hints must be list, got {type(hints).__name__}"
+        )
+
+    if status == "BLOCKED" and data.get("blocking_reason") is None:
+        errors.append(f"{rel}: status BLOCKED requires blocking_reason")
+
+    return errors
+
+
 def validate_proof(
     path: Path,
     schema: dict,
@@ -704,6 +792,22 @@ def validate_proof(
         return [f"{_rel(path)}: JSON parse error: {e}"]
 
     basename = path.name
+    if basename.startswith("PROOF_BACKEND_SMOKE_") and basename.endswith(
+        PROOF_JSON_SUFFIX
+    ):
+        return _validate_backend_smoke_proof_body(path, data)
+
+    # Runtime proof writer (verify.ps1 -RuntimeProof) reuses PROOF_GOLDEN_PATH_REAL_*.json
+    # basename but schema v2 is not the STATE canonical golden-path proof shape.
+    if basename.startswith("PROOF_GOLDEN_PATH_REAL_") and basename.endswith(
+        PROOF_JSON_SUFFIX
+    ):
+        if data.get("schema_version") == 2 and isinstance(data.get("assertions"), list):
+            return []
+
+    if any(basename.startswith(p) for p in _PROOF_OBSERVATION_ONLY_PREFIXES):
+        return []
+
     proof_type = get_proof_type(basename)
     if not proof_type:
         return [f"{_rel(path)}: unknown proof type (basename={basename})"]

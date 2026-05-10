@@ -14,7 +14,8 @@ jobs:
   test-backend:
     name: Test Python Backend
     runs-on: ubuntu-latest
-    
+    timeout-minutes: 90
+
     strategy:
       matrix:
         python-version: ['3.10', '3.11']
@@ -32,11 +33,15 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-          if [ -f requirements_engines.txt ]; then pip install -r requirements_engines.txt; fi
+          # PR/unit gates: do not install requirements_engines.txt here — CUDA torch + native
+          # wheels (e.g. aeneas) are heavy and break ubuntu-latest matrix; unit/integration
+          # under tests/unit and tests/integration do not exercise engine subprocesses.
+          # Engine installs remain on self-hosted / nightly jobs (see nightly-golden-loop-real).
           
       - name: Run unit tests with coverage
+        timeout-minutes: 60
         run: |
-          pytest tests/unit/ -v --cov=backend --cov-report=xml --cov-report=html --cov-report=term-missing
+          pytest tests/unit/ -v --cov=backend --cov-report=xml --cov-report=html --cov-report=term-missing --timeout=120 --tb=short --durations=25
         # NOTE: Critical tests - failures will block the workflow
         
       - name: Enforce coverage threshold (95%)
@@ -45,8 +50,9 @@ jobs:
         # Phase 4: Coverage threshold enforcement at 95%
         
       - name: Run integration tests
+        timeout-minutes: 30
         run: |
-          pytest tests/integration/ -v
+          pytest tests/integration/ -v --timeout=60 --tb=short --durations=25
         # NOTE: Critical tests - failures will block the workflow
         
       - name: Upload coverage reports
@@ -83,7 +89,7 @@ jobs:
   test-frontend:
     name: Test C# Frontend (${{ matrix.configuration }})
     runs-on: windows-latest
-    
+
     strategy:
       matrix:
         configuration: [Debug, Release]
@@ -106,6 +112,7 @@ jobs:
         run: dotnet build VoiceStudio.sln -c ${{ matrix.configuration }} -p:Platform=${{ matrix.platform }}
         
       - name: Run unit tests with coverage (${{ matrix.configuration }})
+        timeout-minutes: 45
         run: dotnet test src/VoiceStudio.App.Tests/VoiceStudio.App.Tests.csproj -c ${{ matrix.configuration }} -p:Platform=${{ matrix.platform }} --verbosity normal --collect:"XPlat Code Coverage" --filter "TestCategory!=Smoke" -- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=cobertura
         # NOTE: Critical tests - failures will block the workflow
         
@@ -206,6 +213,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
         
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -507,8 +516,9 @@ jobs:
   coverage-gate:
     name: Coverage Threshold Gate (95%)
     runs-on: ubuntu-latest
+    timeout-minutes: 90
     needs: [test-backend]
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -525,9 +535,10 @@ jobs:
           pip install pytest pytest-cov coverage
           
       - name: Run tests with coverage
+        timeout-minutes: 60
         run: |
-          pytest tests/unit/ -v --cov=backend --cov=app --cov-report=xml --cov-report=term-missing
-          
+          pytest tests/unit/ -v --cov=backend --cov=app --cov-report=xml --cov-report=term-missing --timeout=120
+
       - name: Enforce 95% coverage threshold
         run: |
           coverage report --fail-under=95
@@ -569,6 +580,9 @@ jobs:
           pip install -r requirements.txt
 
       - name: Run verification checks
+        env:
+          # ubuntu-latest has no WinUI app / startup_decision.json (GAP-069 guard)
+          VOICESTUDIO_SKIP_STARTUP_ARTIFACT_CHECK: "true"
         run: python scripts/run_verification.py
         
       - name: Upload verification report

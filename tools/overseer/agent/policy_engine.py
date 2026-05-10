@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import fnmatch
 import os
-import re
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
@@ -85,15 +84,25 @@ class PolicyEngine:
         self._policy = self._loader.load(policy_name)
         self._policy_name = policy_name
 
-        # Cache expanded environment variables
-        self._env_vars = {
-            "PROJECT_ROOT": os.environ.get("PROJECT_ROOT", os.getcwd()),
-            "APPDATA": os.environ.get("APPDATA", os.path.expanduser("~")),
-            "TEMP": os.environ.get("TEMP", "/tmp"),
-            "PROGRAMFILES": os.environ.get("PROGRAMFILES", "C:\\Program Files"),
-            "PROGRAMFILES(X86)": os.environ.get("PROGRAMFILES(X86)", "C:\\Program Files (x86)"),
-            "WINDIR": os.environ.get("WINDIR", "C:\\Windows"),
-        }
+        # Snapshot for pattern expansion; refreshed on each evaluate() so tests or
+        # callers that update os.environ (e.g. PROJECT_ROOT) see current values.
+        self._env_vars: dict[str, str] = {}
+        self._sync_env_vars_from_os()
+
+    def _sync_env_vars_from_os(self) -> None:
+        """Refresh path-related variables from os.environ for policy matching."""
+        self._env_vars.update(
+            {
+                "PROJECT_ROOT": os.environ.get("PROJECT_ROOT", os.getcwd()),
+                "APPDATA": os.environ.get("APPDATA", os.path.expanduser("~")),
+                "TEMP": os.environ.get("TEMP", "/tmp"),
+                "PROGRAMFILES": os.environ.get("PROGRAMFILES", "C:\\Program Files"),
+                "PROGRAMFILES(X86)": os.environ.get(
+                    "PROGRAMFILES(X86)", "C:\\Program Files (x86)"
+                ),
+                "WINDIR": os.environ.get("WINDIR", "C:\\Windows"),
+            }
+        )
 
     def reload(self, policy_name: str | None = None) -> None:
         """Reload the policy from disk."""
@@ -118,6 +127,8 @@ class PolicyEngine:
         Returns:
             PolicyResult with decision and details
         """
+        self._sync_env_vars_from_os()
+
         violations = []
 
         # Get tool restrictions
@@ -235,18 +246,42 @@ class PolicyEngine:
         expanded_pattern = self._expand_path(pattern)
 
         # Normalize paths
-        path = path.replace("\\", "/")
-        expanded_pattern = expanded_pattern.replace("\\", "/")
+        path_n = path.replace("\\", "/")
+        pat = expanded_pattern.replace("\\", "/")
 
-        # Handle ** for recursive matching
-        if "**" in expanded_pattern:
-            # Convert to regex
-            regex_pattern = expanded_pattern.replace("**", ".*")
-            regex_pattern = regex_pattern.replace("*", "[^/]*")
-            regex_pattern = f"^{regex_pattern}$"
-            return bool(re.match(regex_pattern, path))
-        else:
-            return fnmatch.fnmatch(path, expanded_pattern)
+        # Overseer-style allow-all
+        if pat == "**":
+            return True
+
+        # Deny / cross-root patterns from base_policy.yaml (before generic PREFIX/**)
+        if pat == "**/.env":
+            return path_n.endswith("/.env") or path_n == ".env"
+        if pat == "**/.env.*":
+            leaf = path_n.rsplit("/", 1)[-1]
+            return leaf.startswith(".env.") and leaf != ".env"
+        if pat == "**/secrets/**":
+            return "/secrets/" in path_n or path_n.startswith("secrets/")
+        if pat == "**/credentials/**":
+            return "/credentials/" in path_n or path_n.startswith("credentials/")
+        if pat == "**/config/api-keys.json":
+            return path_n.endswith("/config/api-keys.json")
+        for ext in (".exe", ".dll", ".sys", ".key", ".pem"):
+            if pat == f"**/*{ext}":
+                return path_n.lower().endswith(ext)
+
+        # Any path under a directory prefix (covers ${ROOT}/**, ${ROOT}/src/**, etc.)
+        # Not for patterns starting with **/ — those are handled above.
+        if pat.endswith("/**") and not pat.startswith("**/"):
+            root = pat[:-2].rstrip("/")
+            if not root:
+                return True
+            return path_n == root or path_n.startswith(root + "/")
+
+        if "**" in pat:
+            # Conservative: unknown ** shape — avoid the old buggy regex
+            return False
+
+        return fnmatch.fnmatch(path_n, pat)
 
     def _check_path_restrictions(
         self,

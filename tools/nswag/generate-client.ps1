@@ -143,11 +143,15 @@ try {
         # Post-processing: Fix NSwag pragma bug
         # NSwag incorrectly generates "#pragma restore disable" instead of "#pragma warning restore"
         $content = Get-Content $outputPath -Raw
+        # Strip UTF-8 BOM if present so committed client matches CI (Validate API Contracts drift gate).
+        if ($content.Length -ge 1 -and [int][char]$content[0] -eq 0xFEFF) {
+            $content = $content.Substring(1)
+        }
         $originalContent = $content
         $content = $content -replace '#pragma restore disable', '#pragma warning restore'
-        
+        $utf8NoBom = New-Object System.Text.UTF8Encoding $false
+        [System.IO.File]::WriteAllText($outputPath, $content, $utf8NoBom)
         if ($content -ne $originalContent) {
-            $content | Out-File -FilePath $outputPath -Encoding UTF8 -NoNewline
             Write-Host "[FIX] Corrected pragma directive in generated file" -ForegroundColor Yellow
         }
         

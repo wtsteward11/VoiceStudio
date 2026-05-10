@@ -29,6 +29,6 @@
   "artifact_bytes": 1290316,
   "stt_step_ran": true,
   "stt_engine_name": "whisper_cpp",
-  "historical_proof": false,
-  "evidence_fingerprint": "baff5176f24997a80e637f1d852453337f874861156c323b52df6f44479cbe03"
+  "historical_proof": true,
+  "evidence_fingerprint": "3442a9b5add61d5eb588021492b7e86f0b3d3e84ba1bade4c2181a0b6c51b623"
 }

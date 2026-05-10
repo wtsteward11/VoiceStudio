@@ -45,7 +45,8 @@ public sealed class Gap008Slice4Tests
         StringAssert.Contains(text, "await _projectWorkflowCommandBridge.SaveProjectAsync");
         StringAssert.Contains(text, "await _projectWorkflowCommandBridge.CreateNewProjectAsync");
         StringAssert.Contains(text, "await _projectWorkflowCommandBridge.OpenProjectAsync");
-        StringAssert.Contains(text, "await _projectWorkflowCommandBridge.OpenRecentProjectAsync");
+        // Open-recent is invoked from recent-menu shell bridge (lambda), not a direct await in menu handlers.
+        StringAssert.Contains(text, "_projectWorkflowCommandBridge.OpenRecentProjectAsync");
     }
 
     [TestMethod]
@@ -54,7 +55,8 @@ public sealed class Gap008Slice4Tests
         var text = File.ReadAllText(MainWindowPath);
         StringAssert.Contains(text, "PopulateRecentProjectsMenu");
         StringAssert.Contains(text, "GetProjectWorkflowCoordinatorForSessionLifecycle");
-        StringAssert.Contains(text, "private async void PinRecentProject");
+        // Pin/unpin/clear flows through recent-projects mutation bridge (GAP-008 follow-on).
+        StringAssert.Contains(text, "_recentProjectsMutationBridge.PinRecentProjectAsync");
     }
 
     [TestMethod]

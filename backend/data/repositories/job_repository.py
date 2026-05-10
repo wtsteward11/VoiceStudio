@@ -336,19 +336,18 @@ class JobRepository(BaseRepository[JobEntity]):
         return int(self._connection.total_changes)
 
 
-# In-memory fallback repository for graceful degradation
+# In-memory repository used by unit tests (explicit injection only).
 class InMemoryJobRepository:
     """
-    In-memory fallback repository for when database is unavailable.
+    In-memory job repository for tests.
 
-    Provides the same interface as JobRepository but stores data in memory.
-    Used for graceful degradation when database connection fails.
+    This is **not** an automatic production substitute for SQLite.
     """
 
     def __init__(self):
         self._jobs: dict[str, JobEntity] = {}
         self._is_fallback = True
-        logger.info("Using InMemoryJobRepository fallback (database unavailable)")
+        logger.info("Using InMemoryJobRepository (test/diagnostic mode)")
 
     def _active_jobs(self) -> list[JobEntity]:
         """Jobs not soft-deleted."""
@@ -548,16 +547,15 @@ class InMemoryJobRepository:
 
 
 # Singleton instance for dependency injection
-_job_repository: Any | None = None  # Can be JobRepository or InMemoryJobRepository
+_job_repository: Any | None = None  # Typically JobRepository; may be InMemoryJobRepository when tests inject it
 _job_repository_init_attempted: bool = False
 
 
 def get_job_repository() -> Any:
-    """
-    Get or create JobRepository singleton with graceful fallback.
+    """Get or create the JobRepository singleton.
 
-    If database initialization fails, falls back to InMemoryJobRepository
-    to allow the API to function without database persistence.
+    Policy: **no silent persistence substitution**. If SQLite cannot be initialized, this raises
+    a clear error rather than switching to an in-memory store.
     """
     global _job_repository, _job_repository_init_attempted
 
@@ -565,35 +563,32 @@ def get_job_repository() -> Any:
         return _job_repository
 
     if _job_repository_init_attempted:
-        # Already tried and failed, return in-memory fallback
-        _job_repository = InMemoryJobRepository()
-        return _job_repository
+        raise RuntimeError(
+            "JobRepository initialization previously failed; refusing to continue without SQLite persistence."
+        )
 
     _job_repository_init_attempted = True
 
     try:
         repo = JobRepository()
-        # Test connection by trying to connect
         import asyncio
 
         try:
             loop = asyncio.get_event_loop()
             if loop.is_running():
-                # Can't await in sync context with running loop, use fallback
-                logger.debug("Event loop running, using lazy database validation")
+                # Defer actual DB validation to first awaited repository call.
                 _job_repository = repo
             else:
                 loop.run_until_complete(repo.connect())
                 _job_repository = repo
                 logger.info("JobRepository initialized successfully with database")
         except RuntimeError:
-            # No event loop, create one for initialization
             asyncio.run(repo.connect())
             _job_repository = repo
             logger.info("JobRepository initialized successfully with database")
     except Exception as e:
-        logger.warning(f"JobRepository database init failed, using in-memory fallback: {e}")
-        _job_repository = InMemoryJobRepository()
+        _job_repository = None
+        raise RuntimeError(f"JobRepository database initialization failed: {e}") from e
 
     return _job_repository
 

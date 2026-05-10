@@ -28,7 +28,6 @@ _ensemble_jobs: dict[str, dict] = {}
 
 # In-memory multi-engine ensemble jobs storage (IDEA 55)
 _multi_engine_ensemble_jobs: dict[str, dict] = {}
-_state_lock = asyncio.Lock()
 
 
 class EnsembleVoice(BaseModel):

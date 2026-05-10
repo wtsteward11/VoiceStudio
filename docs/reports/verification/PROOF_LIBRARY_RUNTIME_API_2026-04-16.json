@@ -47,5 +47,11 @@
     "code_fix": "Added FoldersResponse wrapper class so GET /folders returns {folders: [...]} matching C# LibraryFoldersResponse. Added sqlite3.OperationalError guard to /folders endpoint (was only on /assets).",
     "data_truth": "Library database has assets. Routes return truthful data, not infrastructure errors."
   },
-  "verdict": "ALL_PASS"
+  "verdict": "ALL_PASS",
+  "command": "Operator HTTP capture: library API routes vs live backend (see schema VoiceStudio.library_api_proof.v1)",
+  "exit_code": 0,
+  "timestamp": "2026-04-16T11:53:40.729264+00:00",
+  "git_commit": "0000000000000000000000000000000000000000",
+  "git_branch": "historical_verification_artifact",
+  "evidence_fingerprint": "df2f8842f5f9a33782814fa9232b76cad5a893ea9e2b1f51f8d6f9a445fffaf1"
 }

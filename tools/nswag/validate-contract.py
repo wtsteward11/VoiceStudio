@@ -16,7 +16,6 @@ Usage:
 
 import argparse
 import json
-import re
 import subprocess
 import sys
 from dataclasses import dataclass, field
@@ -96,19 +95,73 @@ def parse_openapi_schema(schema_path: Path) -> list[ContractEndpoint]:
     return endpoints
 
 
+def _task_return_type_end(content: str, inner_start: int) -> int | None:
+    """Return index after the closing `>` of `Task<...>` starting at inner_start (first char inside `<`)."""
+    depth = 1
+    k = inner_start
+    while k < len(content) and depth > 0:
+        c = content[k]
+        if c == "<":
+            depth += 1
+        elif c == ">":
+            depth -= 1
+        k += 1
+    if depth != 0:
+        return None
+    return k
+
+
 def parse_csharp_client(client_path: Path) -> set[str]:
-    """Parse C# client to extract method names."""
+    """Parse C# client to extract operation method stems (name without trailing Async).
+
+    NSwag emits `System.Threading.Tasks.Task<...> Operation_id_from_openapiAsync(` or, for
+    no-content responses, `System.Threading.Tasks.Task Operation_idAsync(` (non-generic Task).
+    Implementations may place `async` after `Task<...>` and before the method name
+    (e.g. `public virtual async System.Threading.Tasks.Task<object> NameAsync(`).
+
+    Return types may nest generics (`Task<ICollection<Foo>>`); a naive `Task<[^>]+>` regex
+    stops at the first `>` and misses those methods.
+    """
     content = client_path.read_text(encoding="utf-8")
-
-    # Find all async method declarations
-    method_pattern = re.compile(
-        r'public\s+(?:virtual\s+)?(?:async\s+)?System\.Threading\.Tasks\.Task<[^>]+>\s+(\w+)Async\s*\(',
-        re.MULTILINE
-    )
-
-    methods = set()
-    for match in method_pattern.finditer(content):
-        methods.add(match.group(1))
+    methods: set[str] = set()
+    base = "System.Threading.Tasks.Task"
+    i = 0
+    while True:
+        j = content.find(base, i)
+        if j == -1:
+            break
+        pos = j + len(base)
+        while pos < len(content) and content[pos] in " \t\r\n":
+            pos += 1
+        if pos < len(content) and content[pos] == "<":
+            inner_start = pos + 1
+            end_task = _task_return_type_end(content, inner_start)
+            if end_task is None:
+                i = j + 1
+                continue
+            m_idx = end_task
+        else:
+            m_idx = pos
+        while m_idx < len(content) and content[m_idx] in " \t\r\n":
+            m_idx += 1
+        # NSwag implementation methods: `public virtual async System.Threading.Tasks.Task<...> NameAsync(`
+        if (
+            m_idx + 5 <= len(content)
+            and content[m_idx : m_idx + 5] == "async"
+            and (m_idx + 5 == len(content) or not (content[m_idx + 5].isalnum() or content[m_idx + 5] == "_"))
+        ):
+            prev = content[m_idx - 1] if m_idx > 0 else " "
+            if not (prev.isalnum() or prev == "_"):
+                m_idx += 5
+                while m_idx < len(content) and content[m_idx] in " \t\r\n":
+                    m_idx += 1
+        name_start = m_idx
+        while m_idx < len(content) and (content[m_idx].isalnum() or content[m_idx] == "_"):
+            m_idx += 1
+        name = content[name_start:m_idx]
+        if name.endswith("Async") and m_idx < len(content) and content[m_idx] == "(":
+            methods.add(name[: -len("Async")])
+        i = j + 1
 
     return methods
 

@@ -428,11 +428,70 @@ def redirect_voicestudio_json_stores_to_session_tmp(
 
 
 def pytest_sessionfinish(session, exitstatus: int) -> None:
-    """Session cleanup hook (reserved).
+    """Session cleanup hook — cooperative shutdown of known leak sources.
 
     Do **not** scan ``gc.get_objects()`` here: after large ML imports the heap can
     contain millions of tracked objects; a full scan can stall for minutes and
     block process exit (GAP-069 Slice 10). ``EnhancedResourceManager`` teardown
     is handled in ``tests/unit/core/runtime/test_resource_manager_enhanced.py``
     (autouse fixture) and ``shutdown()`` joins the monitoring thread.
+
+    Safety-net (PR #49 post-pytest hang): even when individual fixtures correctly
+    drive FastAPI lifespan shutdown, ad-hoc ``TestClient(app)`` constructions in
+    individual test modules can still leave non-daemon worker threads alive,
+    which blocks process exit on CI Linux runners. Best-effort cooperative
+    shutdown of well-known module-level singletons is performed below; any
+    ImportError or AttributeError is swallowed because the singleton may not
+    have been loaded by this test session.
     """
+    import logging
+    import sys
+    import threading
+
+    log = logging.getLogger(__name__)
+
+    # 1. Stop the background task scheduler (asyncio task; harmless if already
+    # stopped or never started). The scheduler is started by FastAPI lifespan
+    # ``on_startup_prepare``; if any test uses ``with TestClient(app)`` and
+    # shutdown is interrupted, this idempotent stop ensures no asyncio task
+    # is left waiting on a dead loop.
+    try:
+        from app.core.tasks.scheduler import get_scheduler
+
+        scheduler = get_scheduler()
+        if getattr(scheduler, "_running", False):
+            scheduler.stop()
+    except (ImportError, AttributeError, RuntimeError) as exc:  # noqa: PERF203
+        log.debug("scheduler stop skipped: %s", exc)
+
+    # 2. Drain any leaked ``concurrent.futures.thread`` worker threads. The
+    # offending pattern is ``ThreadPoolExecutor`` constructed without a
+    # ``with`` block in route handlers (e.g., ``backend/api/routes/orchestrator.py``);
+    # CPython worker threads are non-daemon and only exit when ``_python_exit``
+    # signals their queues. Calling it now (rather than via atexit) lets us
+    # observe the result in pytest output instead of waiting for atexit.
+    try:
+        from concurrent.futures import thread as _futures_thread
+
+        py_exit = getattr(_futures_thread, "_python_exit", None)
+        if py_exit is not None:
+            py_exit()
+    except Exception as exc:  # noqa: BLE001 - best effort cleanup
+        log.debug("ThreadPoolExecutor drain skipped: %s", exc)
+
+    # 3. Diagnostic: log any non-daemon threads still alive so that if the
+    # process does hang, CI logs show exactly what survived. We never kill
+    # them (Python forbids forced thread termination); the visibility is
+    # what makes future regressions debuggable.
+    survivors = [
+        t
+        for t in threading.enumerate()
+        if t is not threading.main_thread() and not t.daemon and t.is_alive()
+    ]
+    if survivors:
+        sys.stderr.write(
+            "\n[pytest_sessionfinish] non-daemon survivors that may block exit:\n"
+        )
+        for t in survivors:
+            sys.stderr.write(f"  - name={t.name!r} ident={t.ident}\n")
+        sys.stderr.flush()

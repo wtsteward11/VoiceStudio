@@ -383,19 +383,18 @@ class LibraryAssetRepository(BaseRepository[LibraryAssetEntity]):
         }
 
 
-# In-memory fallback repository for graceful degradation
+# In-memory repositories for unit tests (explicit injection only).
 class InMemoryLibraryAssetRepository:
     """
-    In-memory fallback repository for when database is unavailable.
+    In-memory library asset repository for tests.
 
-    Provides the same interface as LibraryAssetRepository but stores data in memory.
-    Used for graceful degradation when database connection fails.
+    This is **not** an automatic production substitute for SQLite.
     """
 
     def __init__(self):
         self._assets: dict[str, LibraryAssetEntity] = {}
         self._is_fallback = True
-        logger.info("Using InMemoryLibraryAssetRepository fallback (database unavailable)")
+        logger.info("Using InMemoryLibraryAssetRepository (test/diagnostic mode)")
 
     async def get_all(self, options: QueryOptions | None = None) -> list[LibraryAssetEntity]:
         """Get all assets."""
@@ -503,13 +502,15 @@ class InMemoryLibraryAssetRepository:
 
 class InMemoryLibraryFolderRepository:
     """
-    In-memory fallback repository for library folders.
+    In-memory library folder repository for tests.
+
+    This is **not** an automatic production substitute for SQLite.
     """
 
     def __init__(self):
         self._folders: dict[str, LibraryFolderEntity] = {}
         self._is_fallback = True
-        logger.info("Using InMemoryLibraryFolderRepository fallback (database unavailable)")
+        logger.info("Using InMemoryLibraryFolderRepository (test/diagnostic mode)")
 
     async def get_all(self, options: QueryOptions | None = None) -> list[LibraryFolderEntity]:
         """Get all folders."""

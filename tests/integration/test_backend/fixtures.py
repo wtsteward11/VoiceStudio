@@ -313,12 +313,16 @@ def create_test_client(
         config: Test configuration. If None, uses default.
 
     Returns:
-        IntegrationTestClient with tracking and validation.
+        IntegrationTestClient with tracking and validation. The returned
+        wrapper exposes ``close()`` and ``__enter__``/``__exit__`` so callers
+        and fixtures can drive FastAPI lifespan shutdown (which otherwise
+        never runs and has been observed to leave non-daemon worker threads
+        alive on CI; see PR #49 post-pytest hang).
 
     Usage:
-        client = create_test_client()
-        response = client.get("/api/health")
-        assert response.is_success
+        with create_test_client() as client:
+            response = client.get("/api/health")
+            assert response.is_success
     """
     from fastapi.testclient import TestClient
 
@@ -337,7 +341,11 @@ def create_test_client(
             def health():
                 return {"status": "ok"}
 
+    # Drive lifespan startup explicitly via __enter__ so on_shutdown can later
+    # be triggered via __exit__ / close(); IntegrationTestClient delegates the
+    # context-manager protocol to the underlying TestClient.
     test_client = TestClient(app)
+    test_client.__enter__()
     return IntegrationTestClient(
         client=test_client,
         config=config or TEST_CONFIG,
@@ -420,9 +428,13 @@ def svc_context() -> Generator[ServiceTestContext, None, None]:
 
 
 @pytest.fixture(scope="function")
-def integration_client() -> IntegrationTestClient:
-    """Provide integration test client."""
-    return create_test_client()
+def integration_client() -> Generator[IntegrationTestClient, None, None]:
+    """Provide integration test client (with lifespan shutdown on teardown)."""
+    client = create_test_client()
+    try:
+        yield client
+    finally:
+        client.close()
 
 
 # =============================================================================

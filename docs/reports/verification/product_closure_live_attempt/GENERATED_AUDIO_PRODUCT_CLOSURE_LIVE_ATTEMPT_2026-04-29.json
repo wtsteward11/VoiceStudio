@@ -1,0 +1,229 @@
+{
+  "audio_artifact": {
+    "bits_per_sample": 16,
+    "channels": 1,
+    "container": "RIFF/WAVE",
+    "data_chunk_size": 307232,
+    "duration_seconds_from_wav": 6.400666666666667,
+    "error": null,
+    "header_hex": "5249464644b0040057415645666d7420",
+    "non_silent": true,
+    "not_json_error_body": true,
+    "peak_abs_sample": 32767,
+    "rms": 2389.4753379849294,
+    "sample_rate_hz": 24000,
+    "sha256": "9a05871ce522bac603d50e467499e8b6d2d5e86d1429eca889909fc56a5bdd4c",
+    "size_bytes": 307276
+  },
+  "backend": {
+    "base_url": "http://127.0.0.1:8000",
+    "health_body": {
+      "checks": {
+        "database": {
+          "message": "Check completed",
+          "response_time_ms": 4.141092300415039,
+          "status": "healthy"
+        },
+        "engines": {
+          "message": "Check completed",
+          "response_time_ms": 11.949539184570312,
+          "status": "healthy"
+        },
+        "gpu": {
+          "message": "Check completed",
+          "response_time_ms": 0.5636215209960938,
+          "status": "unhealthy"
+        },
+        "plugins": {
+          "message": "Check completed",
+          "response_time_ms": 0.5636215209960938,
+          "status": "healthy"
+        }
+      },
+      "details": {
+        "database": {
+          "message": "Check completed",
+          "response_time_ms": 4.141092300415039,
+          "status": "healthy"
+        },
+        "engines": {
+          "available_engines": 64,
+          "engines": [
+            "aeneas",
+            "automatic1111",
+            "bark",
+            "chatterbox",
+            "comfyui",
+            "coqui_tts",
+            "deepfacelab",
+            "deforum",
+            "espeak_ng",
+            "f5_tts"
+          ],
+          "initialized": [],
+          "initialized_engines": 0,
+          "message": "Engine availability derived from manifests (safe mode)",
+          "status": "healthy",
+          "total_engines": 64
+        },
+        "gpu": {
+          "available": false,
+          "message": "GPU check skipped (set VOICESTUDIO_HEALTH_ENABLE_TORCH=1 to enable torch-based GPU detection)",
+          "status": "degraded"
+        },
+        "plugins": {
+          "installed_count": 0,
+          "plugins": [],
+          "status": "healthy"
+        },
+        "resources": {
+          "gpu": {},
+          "tasks": {
+            "active": 0,
+            "running": 0
+          },
+          "validation": {
+            "cache_size": 0
+          }
+        },
+        "system": {
+          "cpu_percent": 0.0,
+          "memory_mb": 316.75390625,
+          "memory_percent": 0.4898174816921739
+        }
+      },
+      "status": "degraded",
+      "timestamp": "2026-04-29T23:23:12.923799"
+    },
+    "health_status": 200,
+    "readiness_body": {
+      "ready": true,
+      "status": "ready",
+      "timestamp": "2026-04-29T23:23:12.949246"
+    },
+    "readiness_status": 200
+  },
+  "blockers": [],
+  "classification": "REAL_ENGINE",
+  "durability": {
+    "blocker": "durability check not requested",
+    "claimed": false,
+    "evidence": [],
+    "reload_verified": false,
+    "restart_performed": false
+  },
+  "engine_mode_source": "runtime_probe",
+  "environment": {
+    "stub_gate_active": false,
+    "voicestudio_test_mode": null
+  },
+  "export": {
+    "blocker": null,
+    "channels": 1,
+    "claimed": true,
+    "container": "RIFF/WAVE",
+    "duration_seconds_from_wav": 6.400666666666667,
+    "export_id": "timeline_export_adf0e3dc",
+    "non_silent": true,
+    "path": "C:\\Users\\Tyler\\AppData\\Roaming\\VoiceStudio\\artifacts\\timeline_export_adf0e3dc.wav",
+    "sample_rate_hz": 24000,
+    "sha256": "9a05871ce522bac603d50e467499e8b6d2d5e86d1429eca889909fc56a5bdd4c",
+    "size_bytes": 307276
+  },
+  "generated_audio": {
+    "artifact_path": "C:\\Users\\Tyler\\AppData\\Local\\VoiceStudio\\audio_uploads\\125c45b0-51b5-4c8a-a2cc-a6e4243b3a36.wav",
+    "artifact_sha256": "9a05871ce522bac603d50e467499e8b6d2d5e86d1429eca889909fc56a5bdd4c",
+    "audio_id": "synth_9f0364b0-7ead-4b55-9267-57a54796426a_54ec6e78",
+    "created_at_utc": "2026-04-29T23:23:28.140754Z",
+    "duration_seconds": 6.400666666666667,
+    "generated_audio_id": "synth_9f0364b0-7ead-4b55-9267-57a54796426a_54ec6e78",
+    "library_asset_id": "cb553f03-f5b7-47fa-90b5-9b24d45be054",
+    "profile_id": "9f0364b0-7ead-4b55-9267-57a54796426a",
+    "provenance": {
+      "proof_mode": "product_closure",
+      "source": "voice_synthesis"
+    },
+    "routed_engine": "xtts_v2",
+    "source_engine": "xtts_v2",
+    "timeline_clip_id": "9578880d-2e4d-4142-ae6b-3be1510ceb7f",
+    "timeline_track_id": "74c6ff94-9f3b-4eeb-bdf5-3e41045f836b"
+  },
+  "git": {
+    "dirty_summary": "M docs/reports/verification/product_closure_live_attempt/GENERATED_AUDIO_PRODUCT_CLOSURE_LIVE_ATTEMPT_2026-04-29.md;  M scripts/ci/check_voice_synthesis_proof_json.py; ?? backend/data/voicestudio.db; ?? docs/reports/audit/NEXT_MAJOR_COMPLETIONS_ASSESSMENT_2026-04-28.md; ?? docs/reports/audit/SPEED_WITHOUT_DRIFT_PLAN_2026-04-28.md; ?? docs/reports/verification/RUNTIME_TRUTH_LOCAL_STACK_2026-04-29.md; ?? scripts/ci/check_proof_freshness.py; ?? tests/unit/scripts/ci/test_proof_freshness.py",
+    "head": "c41beddab1c8d24ca8c9a4d14db4dae1b8caebce",
+    "origin_main": "f44d7c398d47aa848e48640c15eeb4dd1930b0f2"
+  },
+  "library": {
+    "asset_id": "cb553f03-f5b7-47fa-90b5-9b24d45be054",
+    "audio_id": "125c45b0-51b5-4c8a-a2cc-a6e4243b3a36",
+    "http_status": 201,
+    "saved_path": "C:\\Users\\Tyler\\AppData\\Local\\VoiceStudio\\audio_uploads\\125c45b0-51b5-4c8a-a2cc-a6e4243b3a36.wav"
+  },
+  "non_claims": [
+    "not operator proof",
+    "not runtime FULL PASS",
+    "not GAP-008",
+    "not Slice 46",
+    "not RHVoice",
+    "not ENGINE_PARITY_MATRIX"
+  ],
+  "profile": {
+    "profile_count": 50,
+    "reference_audio_bound": true,
+    "selected_profile_id": "9f0364b0-7ead-4b55-9267-57a54796426a",
+    "selection_reason": "first_reference_audio_bound"
+  },
+  "project": {
+    "persistence_scope": "backend_sqlite",
+    "project_id": "product-closure-live-20260429",
+    "project_name": "Generated Audio Product Authority v1",
+    "reload_verified": true,
+    "session_id": "default"
+  },
+  "proof_type": "voice_synthesis",
+  "requested_engine": "xtts_v2",
+  "routed_engine": "xtts_v2",
+  "dirty_proof_policy": "allow-dirty-proof: this proof was generated at the correct HEAD c41bedda with a dirty working tree during Runtime Truth v1 implementation. The dirty_summary records the ambient modified/untracked files. This is NOT a claim of clean-tree proof generation.",
+  "schema_version": "voice_synthesis_proof.v1",
+  "synthesis": {
+    "audio_id": "synth_9f0364b0-7ead-4b55-9267-57a54796426a_54ec6e78",
+    "audio_url": "/api/voice/audio/synth_9f0364b0-7ead-4b55-9267-57a54796426a_54ec6e78",
+    "duration_seconds": 6.400666666666667,
+    "generated_audio_id": "synth_9f0364b0-7ead-4b55-9267-57a54796426a_54ec6e78",
+    "http_status": 200,
+    "quality_metrics": {
+      "artifact_score": 0.0,
+      "has_clicks": false,
+      "has_distortion": false,
+      "mos_score": 4.7534912109375,
+      "naturalness": 1.0,
+      "similarity": 0.9526517797822591,
+      "snr_db": 77.25608258284804,
+      "voice_profile_match": {
+        "f0_similarity": 0.8242845238708574,
+        "formant_similarity": 0.8654634146341463,
+        "mfcc_cosine_similarity": 0.9901857295806984,
+        "mfcc_distance": 72.70937004267164,
+        "overall_similarity": 0.782318921285961,
+        "recommendations": [
+          "F0 mismatch detected - consider adjusting pitch parameters",
+          "Spectral centroid mismatch - brightness differs from reference"
+        ],
+        "spectral_similarity": 0.27665845345392875
+      }
+    },
+    "quality_score": 0.9506982421875
+  },
+  "timeline": {
+    "clip_id": "9578880d-2e4d-4142-ae6b-3be1510ceb7f",
+    "duration_seconds": 6.400666666666667,
+    "end_time": 6.400666666666667,
+    "revision_after": 41,
+    "revision_before": 38,
+    "session_id": "default",
+    "start_time": 0.0,
+    "track_id": "74c6ff94-9f3b-4eeb-bdf5-3e41045f836b"
+  },
+  "timestamp_utc": "2026-04-29T23:23:28.534627Z",
+  "verdict": "REAL_ENGINE"
+}

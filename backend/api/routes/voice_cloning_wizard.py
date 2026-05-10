@@ -25,7 +25,6 @@ router = APIRouter(prefix="/api/voice/clone/wizard", tags=["voice-cloning-wizard
 # Disk-backed wizard job state (durable across backend restarts)
 _wizard_store = get_job_state_store("voice_cloning_wizard")
 _wizard_jobs: dict[str, WizardJob] = {}
-_state_lock = asyncio.Lock()
 
 
 class WizardJob(BaseModel):
@@ -532,13 +531,8 @@ async def process_wizard(
 
                     job.quality_metrics = await analyze_audio_metrics(job.test_synthesis_audio_id)
                 except Exception as e:
-                    logger.warning(f"Failed to calculate quality metrics: {e}")
-                    job.quality_metrics = {
-                        "mos_score": 4.0,
-                        "similarity": 0.85,
-                        "naturalness": 0.80,
-                        "snr_db": 25.0,
-                    }
+                    logger.warning("Failed to calculate quality metrics: %s", e)
+                    job.quality_metrics = None
 
                 # Finalizing: write all data before marking complete (Audit M-3)
                 # Use intermediate "writing" status to prevent polling race
@@ -548,11 +542,11 @@ async def process_wizard(
                 job.updated_at = datetime.utcnow().isoformat()
                 _wizard_jobs[job_id] = job
 
-                # All data is now persisted; mark as completed
                 job.progress = 1.0
                 job.processing_status = "completed"
                 job.updated_at = datetime.utcnow().isoformat()
                 _wizard_jobs[job_id] = job
+                _persist_wizard_job(job)
 
                 logger.info(
                     "Voice cloning wizard completed: %s, profile: %s",
@@ -561,11 +555,12 @@ async def process_wizard(
                 )
 
             except Exception as e:
-                logger.error(f"Voice cloning wizard processing failed: {e}", exc_info=True)
+                logger.error("Voice cloning wizard processing failed: %s", e, exc_info=True)
                 job.processing_status = "failed"
                 job.error_message = str(e)
                 job.updated_at = datetime.utcnow().isoformat()
                 _wizard_jobs[job_id] = job
+                _persist_wizard_job(job)
 
         # Start processing in background
         asyncio.create_task(process_voice_cloning())

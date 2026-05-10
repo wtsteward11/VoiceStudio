@@ -322,14 +322,6 @@ class EngineService(IEngineService):
     to evolve.
     """
 
-    # Engine fallback priority for graceful degradation
-    ENGINE_FALLBACK_CHAIN: dict[str, list[str]] = {
-        "xtts_v2": ["chatterbox", "bark", "piper"],
-        "chatterbox": ["xtts_v2", "bark", "piper"],
-        "bark": ["xtts_v2", "chatterbox", "piper"],
-        "piper": ["xtts_v2", "chatterbox", "bark"],
-    }
-
     def __init__(self) -> None:
         """Initialize the engine service with lazy loading."""
         self._engine_router = None
@@ -339,7 +331,7 @@ class EngineService(IEngineService):
         self._performance_metrics = None
         self._engines_loaded = False
 
-        # Circuit breakers for graceful degradation
+        # Circuit breakers (per-engine failure containment; not an alternate-engine fallback chain).
         self._circuit_breakers: dict[str, CircuitBreaker] = {}
         self._circuit_breaker_config = CircuitBreakerConfig(
             failure_threshold=3,
@@ -357,10 +349,6 @@ class EngineService(IEngineService):
                 recovery_timeout=self._circuit_breaker_config.recovery_timeout,
             )
         return self._circuit_breakers[engine_id]
-
-    def _get_fallback_engines(self, engine_id: EngineId) -> list[EngineId]:
-        """Get fallback engine chain for graceful degradation."""
-        return self.ENGINE_FALLBACK_CHAIN.get(engine_id, [])
 
     def get_engine_health(self, engine_id: EngineId) -> dict[str, Any]:
         """Get the health status of an engine including circuit breaker state."""
@@ -497,55 +485,45 @@ class EngineService(IEngineService):
     ) -> SynthesisResult:
         """Synthesize speech from text using the specified engine.
 
-        Implements graceful degradation:
-        - Uses circuit breaker to prevent cascading failures
-        - Falls back to alternative engines if primary fails
-        - Records success/failure metrics for health monitoring
+        Policy: **no automatic alternate-engine substitution**. If the requested engine cannot
+        synthesize, callers receive an explicit error payload to surface to the user.
         """
         self._ensure_engines_loaded()
         if self._engine_router is None:
             return {"error": "Engine router not available", "degraded": True}
 
-        # Build engine chain: primary + fallbacks
-        engines_to_try = [engine_id, *self._get_fallback_engines(engine_id)]
-        last_error = None
+        current_engine_id = engine_id
+        breaker = self._get_circuit_breaker(current_engine_id)
 
-        for idx, current_engine_id in enumerate(engines_to_try):
-            breaker = self._get_circuit_breaker(current_engine_id)
+        if not breaker.allow_request():
+            return {
+                "error": f"Circuit breaker OPEN for engine '{current_engine_id}'",
+                "degraded": True,
+                "engine_id": current_engine_id,
+            }
 
-            # Skip if circuit is open
-            if not breaker.allow_request():
-                logger.debug(f"Circuit breaker OPEN for {current_engine_id}, skipping")
-                continue
-
-            try:
-                engine = self._engine_router.get_engine(current_engine_id)
-                if engine is None:
-                    continue
-
-                result = engine.synthesize(text, voice_id=voice_id, **kwargs)
-                breaker.record_success()
-
-                output = result if isinstance(result, dict) else {"audio_path": str(result)}
-                if idx > 0:
-                    output["degraded"] = True
-                    output["fallback_engine"] = current_engine_id
-                    output["primary_engine"] = engine_id
-                    logger.warning(f"Synthesize fell back from {engine_id} to {current_engine_id}")
-                return output
-
-            except Exception as e:
+        try:
+            engine = self._engine_router.get_engine(current_engine_id)
+            if engine is None:
                 breaker.record_failure()
-                last_error = e
-                logger.warning(f"Engine {current_engine_id} failed: {e}")
-                continue
+                return {
+                    "error": f"Engine '{current_engine_id}' is not registered/available",
+                    "degraded": True,
+                    "engine_id": current_engine_id,
+                }
 
-        # All engines failed
-        return {
-            "error": f"All engines failed. Last error: {last_error}",
-            "degraded": True,
-            "engines_tried": engines_to_try,
-        }
+            result = engine.synthesize(text, voice_id=voice_id, **kwargs)
+            breaker.record_success()
+            return result if isinstance(result, dict) else {"audio_path": str(result)}
+
+        except Exception as e:
+            breaker.record_failure()
+            logger.warning("Engine %s failed: %s", current_engine_id, e)
+            return {
+                "error": f"Engine '{current_engine_id}' synthesis failed: {e}",
+                "degraded": True,
+                "engine_id": current_engine_id,
+            }
 
     def clone_voice(
         self,
@@ -556,57 +534,56 @@ class EngineService(IEngineService):
     ) -> SynthesisResult:
         """Clone a voice using reference audio.
 
-        Implements graceful degradation with circuit breaker and fallback.
+        Policy: **no automatic alternate-engine substitution**.
         """
         self._ensure_engines_loaded()
         if self._engine_router is None:
             return {"error": "Engine router not available", "degraded": True}
 
-        # Build engine chain: primary + fallbacks (only voice cloning capable)
-        engines_to_try = [engine_id, *self._get_fallback_engines(engine_id)]
-        last_error = None
+        current_engine_id = engine_id
+        breaker = self._get_circuit_breaker(current_engine_id)
 
-        for idx, current_engine_id in enumerate(engines_to_try):
-            breaker = self._get_circuit_breaker(current_engine_id)
+        if not breaker.allow_request():
+            return {
+                "error": f"Circuit breaker OPEN for engine '{current_engine_id}'",
+                "degraded": True,
+                "engine_id": current_engine_id,
+            }
 
-            if not breaker.allow_request():
-                continue
-
-            try:
-                engine = self._engine_router.get_engine(current_engine_id)
-                if engine is None:
-                    continue
-
-                # Check if engine supports voice cloning
-                if not hasattr(engine, "clone_voice"):
-                    continue
-
-                result = engine.clone_voice(
-                    reference_audio=str(reference_audio),
-                    text=text,
-                    **kwargs,
-                )
-                breaker.record_success()
-
-                output = result if isinstance(result, dict) else {"audio_path": str(result)}
-                if idx > 0:
-                    output["degraded"] = True
-                    output["fallback_engine"] = current_engine_id
-                    output["primary_engine"] = engine_id
-                    logger.warning(f"clone_voice fell back from {engine_id} to {current_engine_id}")
-                return output
-
-            except Exception as e:
+        try:
+            engine = self._engine_router.get_engine(current_engine_id)
+            if engine is None:
                 breaker.record_failure()
-                last_error = e
-                logger.warning(f"Engine {current_engine_id} clone_voice failed: {e}")
-                continue
+                return {
+                    "error": f"Engine '{current_engine_id}' is not registered/available",
+                    "degraded": True,
+                    "engine_id": current_engine_id,
+                }
 
-        return {
-            "error": f"All engines failed. Last error: {last_error}",
-            "degraded": True,
-            "engines_tried": engines_to_try,
-        }
+            if not hasattr(engine, "clone_voice"):
+                breaker.record_failure()
+                return {
+                    "error": f"Engine '{current_engine_id}' does not support clone_voice",
+                    "degraded": True,
+                    "engine_id": current_engine_id,
+                }
+
+            result = engine.clone_voice(
+                reference_audio=str(reference_audio),
+                text=text,
+                **kwargs,
+            )
+            breaker.record_success()
+            return result if isinstance(result, dict) else {"audio_path": str(result)}
+
+        except Exception as e:
+            breaker.record_failure()
+            logger.warning("Engine %s clone_voice failed: %s", current_engine_id, e)
+            return {
+                "error": f"Engine '{current_engine_id}' clone_voice failed: {e}",
+                "degraded": True,
+                "engine_id": current_engine_id,
+            }
 
     # -------------------------------------------------------------------------
     # Transcription Operations

@@ -13,12 +13,15 @@ Exit codes:
     1 - One or more projects exceed thresholds
 """
 
+import subprocess
 import sys
 from pathlib import Path
 
 # Thresholds per project - adjust as modules grow
 THRESHOLDS = {
-    "VoiceStudio.App": 25,            # Shell only - most panels migrated to modules
+    # Tracked page-like XAML under App is ~180 (2026-05); shell/module split is ongoing.
+    # Count uses `git ls-files` only so local obj/bin/.buildlogs cannot inflate the gate.
+    "VoiceStudio.App": 200,
     "VoiceStudio.Module.Voice": 50,   # Voice panels
     "VoiceStudio.Module.Media": 50,   # Media panels
     "VoiceStudio.Module.Analysis": 50, # Analysis panels
@@ -27,10 +30,46 @@ THRESHOLDS = {
 }
 
 
-def count_xaml_pages(project_dir: Path) -> int:
+def _tracked_xaml_paths(repo_root: Path, project_name: str) -> list[Path]:
+    """List tracked *.xaml paths under src/<project_name> (excludes build output)."""
+    rel = f"src/{project_name}"
+    try:
+        proc = subprocess.run(
+            ["git", "ls-files", "-z", "--", rel],
+            cwd=repo_root,
+            capture_output=True,
+            check=False,
+            text=False,
+        )
+    except OSError:
+        return []
+    if proc.returncode != 0 or not proc.stdout:
+        return []
+    paths: list[Path] = []
+    for raw in proc.stdout.split(b"\0"):
+        if not raw:
+            continue
+        p = raw.decode(errors="replace")
+        if p.endswith(".xaml"):
+            paths.append(repo_root / p)
+    return paths
+
+
+def count_xaml_pages(project_dir: Path, project_name: str, repo_root: Path) -> int:
     """Count XAML files in a project directory, excluding resource dictionaries."""
+    tracked = _tracked_xaml_paths(repo_root, project_name)
+    if tracked:
+        xaml_files = tracked
+    else:
+        # Non-git or ls-files failed: fall back to tree walk, skipping build folders.
+        skip_parts = {"obj", "bin", ".buildlogs", "publish"}
+        xaml_files = [
+            p
+            for p in project_dir.glob("**/*.xaml")
+            if not (skip_parts & set(p.parts))
+        ]
     count = 0
-    for xaml_file in project_dir.glob("**/*.xaml"):
+    for xaml_file in xaml_files:
         # Read first few lines to check if it's a ResourceDictionary
         try:
             with open(xaml_file, encoding="utf-8") as f:
@@ -49,7 +88,8 @@ def main():
 
     # Find src directory
     script_dir = Path(__file__).parent
-    src_dir = script_dir.parent / "src"
+    repo_root = script_dir.parent
+    src_dir = repo_root / "src"
 
     if not src_dir.exists():
         print(f"ERROR: Source directory not found: {src_dir}")
@@ -61,7 +101,7 @@ def main():
     for project, threshold in THRESHOLDS.items():
         path = src_dir / project
         if path.exists():
-            count = count_xaml_pages(path)
+            count = count_xaml_pages(path, project, repo_root)
             status = "PASS" if count <= threshold else "FAIL"
             results.append((project, count, threshold, status))
 

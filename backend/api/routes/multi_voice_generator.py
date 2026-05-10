@@ -25,7 +25,6 @@ router = APIRouter(prefix="/api/voice/multi", tags=["multi-voice-generator"])
 
 # In-memory storage for multi-voice jobs (replace with database in production)
 _multi_voice_jobs: dict[str, MultiVoiceJob] = {}
-_state_lock = asyncio.Lock()
 
 
 class VoiceGenerationItem(BaseModel):

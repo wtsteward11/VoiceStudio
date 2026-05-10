@@ -66,6 +66,9 @@ class CorrelationIdFilter(logging.Filter):
 logger = logging.getLogger("sentinel_runner")
 correlation_filter = CorrelationIdFilter()
 logger.addFilter(correlation_filter)
+# Root handlers use %(correlation_id)s in format; ensure third-party loggers get the field.
+for _handler in logging.root.handlers:
+    _handler.addFilter(correlation_filter)
 
 
 def structured_log(

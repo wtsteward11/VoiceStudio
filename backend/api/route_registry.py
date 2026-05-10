@@ -43,6 +43,7 @@ def register_all_routes(app: FastAPI) -> None:
         "batch",
         "consent",
         "dataset",
+        "dialogue",
         "face_swap",
         "dubbing",
         "effects",
@@ -220,6 +221,7 @@ def register_all_routes(app: FastAPI) -> None:
     # Additional routes
     _include_route("eval_abx")
     _include_route("dataset")
+    _include_route("dialogue")
     _include_route("engine")
     _include_route("engines")
     _include_route("engine_audit")

@@ -335,7 +335,13 @@ def contract_client():
         # Ensure routes are loaded (lazy initialization)
         _register_all_routes()
 
-        return TestClient(app)
+        # Use ``with`` so the FastAPI lifespan startup AND shutdown both run.
+        # Without this, the heavy-startup task is never created and shutdown
+        # cleanup (engine stop, scheduler stop, db close) never runs, which
+        # has been observed to leave non-daemon worker threads alive on CI
+        # and block pytest process exit (PR #49 post-pytest hang).
+        with TestClient(app) as c:
+            yield c
     except ImportError:
         pytest.skip("FastAPI or backend not available")
     finally:

@@ -108,5 +108,5 @@ eval_type_backport>=0.3.1  # Python 3.10+ type syntax backport for Pydantic
 # ============================================================================
 # Plugin CLI Dependencies
 # ============================================================================
-click>=8.1.0  # CLI framework for voicestudio-plugin-cli
+click>=8.3.3  # CLI framework for voicestudio-plugin-cli
 cryptography>=42.0.0  # Ed25519 signing for plugin packages (optional)

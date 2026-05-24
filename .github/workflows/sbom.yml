@@ -72,7 +72,7 @@ jobs:
           pip-licenses --format=markdown --output-file=.buildlogs/sbom/python-licenses.md
           
       - name: Upload Python SBOM
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: python-sbom
           path: .buildlogs/sbom/
@@ -111,7 +111,7 @@ jobs:
         continue-on-error: true
         
       - name: Upload .NET SBOM
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: dotnet-sbom
           path: .buildlogs/sbom/
@@ -158,7 +158,7 @@ jobs:
           EOF
           
       - name: Upload combined SBOM
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: voicestudio-sbom
           path: .buildlogs/sbom/

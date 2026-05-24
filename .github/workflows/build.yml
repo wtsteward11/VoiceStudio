@@ -267,7 +267,7 @@ jobs:
           powershell -ExecutionPolicy Bypass -File installer/verify-installer-build.ps1 -InstallerType WiX -Version 0.0.0
 
       - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: frontend-build
           path: |
@@ -275,7 +275,7 @@ jobs:
           retention-days: 7
 
       - name: Upload Gate C artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: gatec-publish
@@ -286,7 +286,7 @@ jobs:
           retention-days: 7
 
       - name: Upload build binlogs (XAML diagnostics)
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: build-binlogs
@@ -302,7 +302,7 @@ jobs:
           if-no-files-found: ignore
 
       - name: Upload Audit Logs
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: audit-logs
@@ -357,7 +357,7 @@ jobs:
           }
           
       - name: Upload XAML Quality Reports
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: xaml-quality-reports
@@ -463,7 +463,7 @@ jobs:
         # GAP-CI-001: Schema export is critical for contract tests (removed continue-on-error)
 
       - name: Upload OpenAPI schema
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: openapi-schema
@@ -528,7 +528,7 @@ jobs:
         run: python scripts/check_warning_budget.py --json
 
       - name: Upload warning report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: warning-budget-report
@@ -558,7 +558,7 @@ jobs:
         run: python scripts/run_verification.py
         
       - name: Upload verification report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: verification-report
@@ -706,7 +706,7 @@ jobs:
           }
 
       - name: Upload contract validation artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: contract-validation
@@ -762,7 +762,7 @@ jobs:
         continue-on-error: true
 
       - name: Upload quality reports
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: quality-scorecard
@@ -820,7 +820,7 @@ jobs:
         continue-on-error: true
 
       - name: Upload regression report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: regression-report

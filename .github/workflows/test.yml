@@ -156,7 +156,7 @@ jobs:
         continue-on-error: true
         
       - name: Upload coverage report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: matrix.configuration == 'Release'
         with:
           name: coverage-report
@@ -165,7 +165,7 @@ jobs:
         continue-on-error: true
         
       - name: Upload test results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: frontend-test-results-${{ matrix.configuration }}
@@ -192,7 +192,7 @@ jobs:
         # ViewModel coverage gate: 50% minimum, increase over time to 80%
         
       - name: Upload ViewModel Coverage Report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: viewmodel-coverage-report
@@ -366,7 +366,7 @@ jobs:
           pkill -f "uvicorn backend.api.main" || true
           
       - name: Upload integration test results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: integration-test-results
@@ -485,7 +485,7 @@ jobs:
         shell: powershell
         
       - name: Upload E2E test results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: e2e-full-app-results
@@ -495,7 +495,7 @@ jobs:
           retention-days: 14
           
       - name: Upload E2E failure logs
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: failure()
         with:
           name: e2e-failure-logs
@@ -540,7 +540,7 @@ jobs:
         continue-on-error: true
         
       - name: Upload coverage data
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: coverage-gate-data
@@ -572,7 +572,7 @@ jobs:
         run: python scripts/run_verification.py
         
       - name: Upload verification report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: verification-report
@@ -605,7 +605,7 @@ jobs:
         # GAP-CI-001: Contract tests should fail CI (removed continue-on-error)
         
       - name: Upload contract test results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: contract-test-results
@@ -641,7 +641,7 @@ jobs:
         continue-on-error: true
         
       - name: Upload performance report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: performance-report
@@ -706,7 +706,7 @@ jobs:
         # GAP-CI-001: UI tests should fail CI (removed continue-on-error)
         
       - name: Upload UI test results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: ui-automation-results
@@ -768,7 +768,7 @@ jobs:
         continue-on-error: true
         
       - name: Upload security scan results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: security-scan-results
@@ -923,7 +923,7 @@ jobs:
         shell: powershell
         
       - name: Upload Nightly UI Test Results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: nightly-ui-test-results
@@ -934,7 +934,7 @@ jobs:
           retention-days: 30
           
       - name: Upload Nightly Build Logs
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: failure()
         with:
           name: nightly-ui-failure-logs

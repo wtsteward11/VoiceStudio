@@ -111,7 +111,7 @@ jobs:
           fi
           
       - name: Upload Python scan results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: python-security-scan
           path: .buildlogs/security/
@@ -147,7 +147,7 @@ jobs:
           dotnet list package --outdated > .buildlogs/security/nuget-outdated.txt 2>&1
           
       - name: Upload .NET scan results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: dotnet-security-scan
           path: .buildlogs/security/
@@ -200,7 +200,7 @@ jobs:
         # GAP-CI-001: CVE monitor should enforce fail_on threshold (removed continue-on-error)
         
       - name: Upload aggregate report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: security-report
           path: .buildlogs/security/

@@ -133,7 +133,7 @@ jobs:
         run: dotnet test src/VoiceStudio.App.Tests/VoiceStudio.App.Tests.csproj -c Release -p:Platform=x64 --filter "TestCategory=DegradedMode|FullyQualifiedName~RateLimitToastDedupeTests" --verbosity normal
       
       - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: voicestudio-build
           path: src/VoiceStudio.App/bin/x64/Release/
@@ -203,7 +203,7 @@ jobs:
           python scripts/ci/check_state_proofs.py --validate-file "docs/reports/verification/PROOF_GOLDEN_PATH_STUB_*.json"
 
       - name: Upload proof artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: golden-path-proof
@@ -277,7 +277,7 @@ jobs:
         shell: pwsh
       
       - name: Upload installer
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: voicestudio-installer
           path: installer/Output/*.exe
@@ -319,7 +319,7 @@ jobs:
         # GAP-CI-001: E2E tests should fail CI (removed continue-on-error)
       
       - name: Upload E2E test results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: e2e-test-results
@@ -397,7 +397,7 @@ jobs:
         # GAP-CI-001: UI smoke tests should fail CI (removed continue-on-error)
       
       - name: Upload UI test results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: python-ui-test-results
@@ -437,7 +437,7 @@ jobs:
             || true
       
       - name: Store benchmark results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: benchmark-results
           path: benchmark-results.json
@@ -543,7 +543,7 @@ jobs:
         shell: pwsh
       
       - name: Upload signed artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: voicestudio-signed-installer
           path: |
@@ -609,7 +609,7 @@ jobs:
           python scripts/ci/check_state_proofs.py --validate-file "docs/reports/verification/PROOF_GOLDEN_PATH_REAL_*.json"
 
       - name: Upload runtime proof artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: runtime-gate-proofs
